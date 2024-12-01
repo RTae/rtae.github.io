@@ -1,4 +1,4 @@
-baseurl = "https://example.com/"
+baseurl = "https://rtae.github.io"
 title = "rtae-portfolio"
 theme = "hugo-theme-console"
 languageCode = "en-us"
