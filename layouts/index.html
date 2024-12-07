@@ -3,14 +3,61 @@
 <h1>About</h1>
 
 <p>
-Hi there 🌟 <a href="about/">(more)</a>
+Hi there 🌟, my name is Natthanan Bhukan, or you can call me "Tae". Currently, I am working as a machine learning engineer at CJ Express Group to develop a machine learning system in the retail sector. 
+I graduated from King Mongkut's University of Technology Thonburi.
 </p>
-<br/>
+<p>
+My research interests focus on developing efficient system support to optimize AI applications within the system and algorithm.
+</p>
 
-<h1>Latest posts</h1>
+<h1>Experience</h1>
+<ul class="styled-list">
+  {{ with .Site.GetPage "/experience" }}
+    {{ range (sort .Pages "Params.start_date" "desc") }}
+      <li>
+        <div class="experience-item">
+          <h2>
+            {{ .Title }} | {{ .Params.location }} | {{ .Params.start_date }} - {{ if .Params.end_date }}{{ .Params.end_date }}{{ else }}Current{{ end }}
+          </h2>
+          <p class="role"><strong>{{ .Params.role }}</strong></p>
+          <ul class="achievements">
+            {{ range .Params.achievements }}
+              <li>{{ . }}</li>
+            {{ end }}
+          </ul>
+        </div>
+      </li>
+    {{ end }}
+  {{ end }}
+</ul>
 
+<h1>Research Papers</h1>
+<ul class="styled-list">
+  {{ with .Site.GetPage "/research-papers" }}
+    {{ range (sort .Pages "Date" "desc") }}
+      <li>
+        <div class="paper">
+          {{ if eq .Params.status "Being Reviewed" }}
+            <span class="paper-title">{{ .Title }}</span>
+            <p><em>{{ .Params.journal }}</em> ({{ .Params.status }})</p>
+          {{ else }}
+            <a href="{{ .Params.external_url }}" class="paper-title" target="_blank">{{ .Title }}</a>
+            <p><em>{{ .Params.journal }}</em> ({{ .PublishDate.Format "01-2006" }})</p>
+          {{ end }}
+          <p class="authors">
+            {{ range (split .Params.authors ",") }}
+              {{ if (eq . "Natthanan Bhukan") }}<strong>{{ . }}</strong>{{ else }}{{ . }}{{ end }},
+            {{ end }}
+          </p>
+        </div>
+      </li>
+    {{ end }}
+  {{ end }}
+</ul>
+
+<h1>Projects</h1>
 <div class="posts-list">
-{{ with .Site.GetPage "/posts" }}
+{{ with .Site.GetPage "/projects" }}
     {{ range first 3 (sort .Data.Pages "Date" "desc" (where .Pages ".Params.private" "!=" true))}}
         <div class="post">
             <p>
@@ -23,20 +70,37 @@ Hi there 🌟 <a href="about/">(more)</a>
 {{ end }}
 </div>
 
-<h1>Latest photos</h1>
 
-<div class="image-grid">
-{{ with .Site.GetPage "/photos" }}
-    {{ range first 3 (sort .Data.Pages "Date" "desc")}}
-        <a href="{{ .Permalink }}" title="{{ .Title }}">
-        {{ $image := .Page.Resources.GetMatch .Params.image }}
-        {{ with $image }}
-            {{ $thumb := .Resize "400x" }}
-            <img src="{{ $thumb.RelPermalink }}" alt="{{ .Title }}" class="img-responsive">
-        {{end}}
-        </a>
+<h1>Articles</h1>
+
+<div class="posts-list">
+{{ with .Site.GetPage "/articles" }}
+    {{ range first 3 (sort .Data.Pages "Date" "desc" (where .Pages ".Params.private" "!=" true))}}
+        <div class="post">
+            <p>
+                <div class="date">{{ .PublishDate.Format "Jan. 2, 2006" }}</div>
+                <h1><a href="{{ .Permalink }}" title="{{ .Title }}">{{ .Title }}</a></h1>
+                {{ .Summary }}
+            </p>
+        </div>    
     {{ end }}
 {{ end }}
 </div>
+
+<h1>Public speaking events</h1>
+
+<div class="posts-list">
+    {{ with .Site.GetPage "/public-speaking-event" }}
+        {{ range first 3 (sort .Data.Pages "Date" "desc" (where .Pages ".Params.private" "!=" true))}}
+            <div class="post">
+                <p>
+                    <div class="date">{{ .PublishDate.Format "Jan. 2, 2006" }}</div>
+                    <h1><a href="{{ .Permalink }}" title="{{ .Title }}">{{ .Title }}</a></h1>
+                    {{ .Summary }}
+                </p>
+            </div>    
+        {{ end }}
+    {{ end }}
+    </div>
 
 {{ end }}

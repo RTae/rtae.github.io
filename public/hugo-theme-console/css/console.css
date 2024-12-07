@@ -277,3 +277,38 @@ figure {
         padding-top: 5px;;
     }
 }
+
+
+.styled-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.styled-list li {
+  margin-bottom: 20px;
+}
+
+.experience-item h2 {
+  font-size: 1.4em;
+  font-weight: bold;
+  margin: 5px 0;
+}
+
+.role {
+  font-size: 1em;
+  color: #333;
+  margin-bottom: 10px;
+}
+
+.achievements {
+  list-style: disc;
+  margin-left: 20px;
+  padding: 0;
+}
+
+.achievements li {
+  font-size: 0.95em;
+  margin-bottom: 8px;
+  line-height: 1.6;
+}
