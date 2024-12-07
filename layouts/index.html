@@ -11,14 +11,18 @@ My research interests focus on developing efficient system support to optimize A
 
 <!-- Social Links Section -->
 <p>
-  <a href="https://github.com/RTae" target="_blank" title="GitHub" style="text-decoration: none !important; color: inherit !important;">
-    <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/github/github-original.svg" alt="GitHub" style="width: 24px; height: 24px; vertical-align: middle;"> GitHub
+  <!-- GitHub Icon -->
+  <a href="https://github.com/RTae" target="_blank" title="GitHub" style="text-decoration: none;">
+    <img class="github-icon" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/github/github-original.svg" alt="GitHub"> GitHub
   </a>
   &nbsp;&nbsp;
-  <a href="https://www.linkedin.com/in/natthananbhukan/" target="_blank" title="LinkedIn" style="text-decoration: none !important; color: inherit !important;">
-    <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/linkedin/linkedin-original.svg" alt="LinkedIn" style="width: 24px; height: 24px; vertical-align: middle;"> LinkedIn
+
+  <!-- LinkedIn Icon -->
+  <a href="https://www.linkedin.com/in/natthananbhukan/" target="_blank" title="LinkedIn" style="text-decoration: none;">
+    <img class="linkedin-icon" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/linkedin/linkedin-original.svg" alt="LinkedIn"> LinkedIn
   </a>
 </p>
+
 
 
 <h1>Research Papers</h1>
@@ -130,61 +134,85 @@ My research interests focus on developing efficient system support to optimize A
 
 
 <style>
-  /* Custom styling for the experience page */
-  .styled-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
+/* Custom styling for the experience page */
+.styled-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.styled-list li {
+  margin-bottom: 25px; /* Adds consistent space between job entries */
+}
+
+.paper-title {
+  font-weight: bold;
+}
+
+.paper-title a {
+  color: #007bff;
+  text-decoration: none;
+}
+
+.paper-title a:hover {
+  text-decoration: underline;
+}
+
+.paper-title span {
+  color: #222;
+  font-style: italic; /* Optional styling for "under review" text */
+}
+
+.experience-item h2 {
+  font-weight: normal; /* Bold styling for the Title (company name) */
+  margin: 5px 0;
+}
+
+.experience-item .title {
+  font-weight: bold; /* Bold styling for the Title (company name) */
+}
+
+.role {
+  font-size: 1em;
+  color: #333;
+  margin: 10px 0;
+}
+
+.achievements {
+  list-style: disc;
+  margin-left: 20px;
+  padding: 0;
+}
+
+.achievements li {
+  font-size: 0.95em;
+  margin-bottom: 8px;
+  line-height: 1.6;
+}
+
+/* Default icon styling */
+.github-icon {
+  width: 24px;
+  height: 24px;
+  vertical-align: middle;
+  transition: filter 0.3s ease;
+}
+
+/* Apply a filter for GitHub icon in dark mode */
+@media (prefers-color-scheme: dark) {
+  .github-icon {
+    filter: invert(100%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(200%) contrast(100%);
   }
-  
-  .styled-list li {
-    margin-bottom: 25px; /* Adds consistent space between job entries */
-  }
-  
-  .paper-title {
-    font-weight: bold;
-  }
-  
-  .paper-title a {
-    color: #007bff;
-    text-decoration: none;
-  }
-  
-  .paper-title a:hover {
-    text-decoration: underline;
-  }
-  
-  .paper-title span {
-    color: #222;
-    font-style: italic; /* Optional styling for "under review" text */
-  }
-  
-  .experience-item h2 {
-    font-weight: normal; /* Bold styling for the Title (company name) */
-    margin: 5px 0;
-  }
-  
-  .experience-item .title {
-    font-weight: bold; /* Bold styling for the Title (company name) */
-  }
-  
-  .role {
-    font-size: 1em;
-    color: #333;
-    margin: 10px 0;
-  }
-  
-  .achievements {
-    list-style: disc;
-    margin-left: 20px;
-    padding: 0;
-  }
-  
-  .achievements li {
-    font-size: 0.95em;
-    margin-bottom: 8px;
-    line-height: 1.6;
-  }
+}
+
+/* Default LinkedIn styling (no changes for dark mode) */
+.linkedin-icon {
+  width: 24px;
+  height: 24px;
+  vertical-align: middle;
+}
+</style>
+
   
 </style>
   

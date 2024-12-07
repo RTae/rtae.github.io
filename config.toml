@@ -18,11 +18,11 @@ languageCode = "en-us"
   [[params.navlinks]]
   name = "articles/"
   url = "articles/"
-  
-  [[params.navlinks]]
-  name = "projects/"
-  url = "projects/"
 
   [[params.navlinks]]
   name = "event/"
   url = "event/"
+
+  [[params.navlinks]]
+  name = "projects/"
+  url = "projects/"
