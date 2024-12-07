@@ -40,7 +40,7 @@
     {{ range (sort .Pages "Date" "desc") }}
       <li>
         <div class="paper">
-          {{ if eq .Params.status "Being Reviewed" }}
+          {{ if eq .Params.status "Being Review" }}
             <span class="paper-title">{{ .Title }}</span>
             <p><em>{{ .Params.journal }}</em> ({{ .Params.status }})</p>
           {{ else }}
