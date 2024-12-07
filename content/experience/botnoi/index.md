@@ -2,7 +2,7 @@
 
 title = "Botnoi Consulting Co. Ltd."
 location = "Bangkok, Thailand"
-role = "Teacher assitance for Data Science essential class"
+role = "Teacher assitance for Data Science Essential class"
 start_date = "2020-06"
 end_date = "2020-12"
 achievements = [

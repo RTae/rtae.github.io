@@ -20,8 +20,8 @@ languageCode = "en-us"
   url = "articles/"
 
   [[params.navlinks]]
-  name = "event/"
-  url = "event/"
+  name = "events/"
+  url = "events/"
 
   [[params.navlinks]]
   name = "projects/"

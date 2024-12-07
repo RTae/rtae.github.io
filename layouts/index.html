@@ -104,7 +104,7 @@ My research interests focus on developing efficient system support to optimize A
 
 <h1>Public speaking events</h1>
 <div class="posts-list">
-{{ with .Site.GetPage "/event" }}
+{{ with .Site.GetPage "/events" }}
     {{ range first 4 (sort .Data.Pages "Date" "desc" (where .Pages ".Params.private" "!=" true))}}
         <div class="post">
             <p>
@@ -127,6 +127,13 @@ My research interests focus on developing efficient system support to optimize A
                 <h1><a href="{{ .Permalink }}" title="{{ .Title }}">{{ .Title }}</a></h1>
                 {{ .Summary }}
             </p>
+            {{ if .Params.github }}
+                <p>
+                    <a href="{{ .Params.github }}" target="_blank" title="GitHub Repository">
+                        <img class="github-icon" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/github/github-original.svg" alt="GitHub"> Repository
+                    </a>
+                </p>
+            {{ end }}
         </div>    
     {{ end }}
 {{ end }}
