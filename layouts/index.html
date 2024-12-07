@@ -17,7 +17,7 @@ My research interests focus on developing efficient system support to optimize A
       <li>
         <div class="experience-item">
           <h2>
-            {{ .Title }} | {{ .Params.location }} | {{ .Params.start_date }} - {{ if .Params.end_date }}{{ .Params.end_date }}{{ else }}Current{{ end }}
+            {{ .Title }} | {{ .Params.location }} | {{ .Params.start_date }} to {{ if .Params.end_date }}{{ .Params.end_date }}{{ else }}Current{{ end }}
           </h2>
           <p class="role"><strong>{{ .Params.role }}</strong></p>
           <ul class="achievements">
@@ -46,7 +46,7 @@ My research interests focus on developing efficient system support to optimize A
           {{ end }}
           <p class="authors">
             {{ range (split .Params.authors ",") }}
-              {{ if (eq . "Natthanan Bhukan") }}<strong>{{ . }}</strong>{{ else }}{{ . }}{{ end }},
+              {{ if (eq . "Natthanan Bhukan") }}<u><strong>{{ . }}</strong></u>{{ else }}{{ . }}{{ end }},
             {{ end }}
           </p>
         </div>
