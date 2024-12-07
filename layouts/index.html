@@ -118,11 +118,11 @@ My research interests focus on developing efficient system support to optimize A
 <h1>Articles</h1>
 <div class="posts-list">
 {{ with .Site.GetPage "/articles" }}
-    {{ range first 3 (sort .Data.Pages "Date" "desc" (where .Pages ".Params.private" "!=" true))}}
+    {{ range first 4 (sort .Data.Pages "Date" "desc" (where .Pages ".Params.private" "!=" true))}}
         <div class="post">
             <p>
-                <div class="date">{{ .PublishDate.Format "Jan. 2, 2006" }}</div>
-                <h1><a href="{{ .Permalink }}" title="{{ .Title }}">{{ .Title }}</a></h1>
+                <div class="date">{{ .PublishDate.Format "01-2006" }}</div>
+                <h1><a href="{{ .Params.external_url }}" title="{{ .Title }}">{{ .Title }}</a></h1>
                 {{ .Summary }}
             </p>
         </div>    
@@ -132,8 +132,8 @@ My research interests focus on developing efficient system support to optimize A
 
 <h1>Public speaking events</h1>
 <div class="posts-list">
-{{ with .Site.GetPage "/public-speaking-event" }}
-    {{ range first 3 (sort .Data.Pages "Date" "desc" (where .Pages ".Params.private" "!=" true))}}
+{{ with .Site.GetPage "/event" }}
+    {{ range first 4 (sort .Data.Pages "Date" "desc" (where .Pages ".Params.private" "!=" true))}}
         <div class="post">
             <p>
                 <div class="date">{{ .PublishDate.Format "Jan. 2, 2006" }}</div>
@@ -148,7 +148,7 @@ My research interests focus on developing efficient system support to optimize A
 <h1>Projects</h1>
 <div class="posts-list">
 {{ with .Site.GetPage "/projects" }}
-    {{ range first 3 (sort .Data.Pages "Date" "desc" (where .Pages ".Params.private" "!=" true))}}
+    {{ range first 4 (sort .Data.Pages "Date" "desc" (where .Pages ".Params.private" "!=" true))}}
         <div class="post">
             <p>
                 <div class="date">{{ .PublishDate.Format "Jan. 2, 2006" }}</div>
