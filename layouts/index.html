@@ -1,65 +1,4 @@
 {{ define "main" }}
-
-<style>
-/* Custom styling for the experience page */
-.styled-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.styled-list li {
-  margin-bottom: 25px; /* Adds consistent space between job entries */
-}
-
-.paper-title {
-  font-size: 1.1em;
-  font-weight: bold;
-}
-
-.paper-title a {
-  color: #007bff;
-  text-decoration: none;
-}
-
-.paper-title a:hover {
-  text-decoration: underline;
-}
-
-.paper-title span {
-  color: #222;
-  font-style: italic; /* Optional styling for "under review" text */
-}
-
-.experience-item h2 {
-  font-weight: normal; /* Bold styling for the Title (company name) */
-  font-size: 1.1em;
-  margin: 5px 0;
-}
-
-.experience-item .title {
-  font-weight: bold; /* Bold styling for the Title (company name) */
-}
-
-.role {
-  font-size: 1em;
-  color: #333;
-  margin: 10px 0;
-}
-
-.achievements {
-  list-style: disc;
-  margin-left: 20px;
-  padding: 0;
-}
-
-.achievements li {
-  font-size: 0.95em;
-  margin-bottom: 8px;
-  line-height: 1.6;
-}
-</style>
-
 <h1>About</h1>
 
 <p>
@@ -70,26 +9,17 @@ I graduated from King Mongkut's University of Technology Thonburi.
 My research interests focus on developing efficient system support to optimize AI applications within the system and algorithm.
 </p>
 
-<h1>Experience</h1>
-<ul class="styled-list">
-  {{ with .Site.GetPage "/experience" }}
-    {{ range (sort .Pages "Params.start_date" "desc") }}
-      <li>
-        <div class="experience-item">
-          <h2>
-            <span class="title">{{ .Title }}</span> | {{ .Params.location }} | {{ .Params.start_date }} to {{ if .Params.end_date }}{{ .Params.end_date }}{{ else }}Current{{ end }}
-          </h2>
-          <p class="role"><strong>{{ .Params.role }}</strong></p>
-          <ul class="achievements">
-            {{ range .Params.achievements }}
-              <li>{{ . }}</li>
-            {{ end }}
-          </ul>
-        </div>
-      </li>
-    {{ end }}
-  {{ end }}
-</ul>
+<!-- Social Links Section -->
+<p>
+  <a href="https://github.com/RTae" target="_blank" title="GitHub" style="text-decoration: none !important; color: inherit !important;">
+    <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/github/github-original.svg" alt="GitHub" style="width: 24px; height: 24px; vertical-align: middle;"> GitHub
+  </a>
+  &nbsp;&nbsp;
+  <a href="https://www.linkedin.com/in/natthananbhukan/" target="_blank" title="LinkedIn" style="text-decoration: none !important; color: inherit !important;">
+    <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/linkedin/linkedin-original.svg" alt="LinkedIn" style="width: 24px; height: 24px; vertical-align: middle;"> LinkedIn
+  </a>
+</p>
+
 
 <h1>Research Papers</h1>
 <ul class="styled-list">
@@ -114,6 +44,44 @@ My research interests focus on developing efficient system support to optimize A
     {{ end }}
   {{ end }}
 </ul>
+
+
+<h1>Experience</h1>
+<ul class="styled-list">
+  {{ with .Site.GetPage "/experience" }}
+    {{ range (sort .Pages "Params.start_date" "desc") }}
+      <li>
+        <div class="experience-item">
+          <h2>
+            <span class="title">{{ .Title }}</span> | {{ .Params.location }} | {{ .Params.start_date }} to {{ if .Params.end_date }}{{ .Params.end_date }}{{ else }}Current{{ end }}
+          </h2>
+          <p class="role"><strong>{{ .Params.role }}</strong></p>
+          <ul class="achievements">
+            {{ range .Params.achievements }}
+              <li>{{ . }}</li>
+            {{ end }}
+          </ul>
+        </div>
+      </li>
+    {{ end }}
+  {{ end }}
+</ul>
+
+<h1>Awards and Honors</h1>
+<div class="posts-list">
+{{ with .Site.GetPage "/awards" }}
+    {{ range first 4 (sort .Data.Pages "Date" "desc" (where .Pages ".Params.private" "!=" true))}}
+        <div class="experience-item">
+            <p>
+                <div class="date">{{ .PublishDate.Format "01-2006" }}</div>
+                <h2>
+                  <span class="title">{{ .Title }}</span>, {{ .Params.location }}
+                </h2>
+            </p>
+        </div>
+    {{ end }}
+{{ end }}
+</div>
 
 <h1>Articles</h1>
 <div class="posts-list">
@@ -159,4 +127,65 @@ My research interests focus on developing efficient system support to optimize A
     {{ end }}
 {{ end }}
 </div>
+
+
+<style>
+  /* Custom styling for the experience page */
+  .styled-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  
+  .styled-list li {
+    margin-bottom: 25px; /* Adds consistent space between job entries */
+  }
+  
+  .paper-title {
+    font-weight: bold;
+  }
+  
+  .paper-title a {
+    color: #007bff;
+    text-decoration: none;
+  }
+  
+  .paper-title a:hover {
+    text-decoration: underline;
+  }
+  
+  .paper-title span {
+    color: #222;
+    font-style: italic; /* Optional styling for "under review" text */
+  }
+  
+  .experience-item h2 {
+    font-weight: normal; /* Bold styling for the Title (company name) */
+    margin: 5px 0;
+  }
+  
+  .experience-item .title {
+    font-weight: bold; /* Bold styling for the Title (company name) */
+  }
+  
+  .role {
+    font-size: 1em;
+    color: #333;
+    margin: 10px 0;
+  }
+  
+  .achievements {
+    list-style: disc;
+    margin-left: 20px;
+    padding: 0;
+  }
+  
+  .achievements li {
+    font-size: 0.95em;
+    margin-bottom: 8px;
+    line-height: 1.6;
+  }
+  
+</style>
+  
 {{ end }}
