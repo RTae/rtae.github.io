@@ -101,6 +101,24 @@
     
         
         <url>
+            <loc>http://localhost:1313/experience/cj/</loc>
+        </url>
+        
+    
+        
+        <url>
+            <loc>http://localhost:1313/experience/dia/</loc>
+        </url>
+        
+    
+        
+        <url>
+            <loc>http://localhost:1313/experience/</loc>
+        </url>
+        
+    
+        
+        <url>
             <loc>http://localhost:1313/tags/</loc>
         </url>
         

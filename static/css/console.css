@@ -1,0 +1,33 @@
+.styled-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.styled-list li {
+  margin-bottom: 25px; /* Adds consistent space between each job */
+}
+
+.experience-item h2 {
+  font-size: 1.4em;
+  font-weight: bold;
+  margin: 5px 0; /* Tightens spacing above and below the company name */
+}
+
+.role {
+  font-size: 1em;
+  color: #333;
+  margin: 10px 0; /* Adjust spacing below the job title */
+}
+
+.achievements {
+  list-style: disc;
+  margin-left: 20px;
+  padding: 0;
+}
+
+.achievements li {
+  font-size: 0.95em;
+  margin-bottom: 8px; /* Spacing between bullet points */
+  line-height: 1.6;
+}
