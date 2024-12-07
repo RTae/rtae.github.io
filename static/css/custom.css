@@ -1,0 +1,53 @@
+/* Custom styling for the experience page */
+.styled-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.styled-list li {
+  margin-bottom: 25px; /* Adds consistent space between job entries */
+}
+
+.paper-title {
+  font-size: 1.2em;
+  font-weight: bold;
+}
+
+.paper-title a {
+  color: #007bff;
+  text-decoration: none;
+}
+
+.paper-title a:hover {
+  text-decoration: underline;
+}
+
+.paper-title span {
+  color: #222;
+  font-style: italic; /* Optional styling for "under review" text */
+}
+
+.experience-item h2 {
+  font-size: 1.4em;
+  font-weight: bold;
+  margin: 5px 0;
+}
+
+.role {
+  font-size: 1em;
+  color: #333;
+  margin: 10px 0;
+}
+
+.achievements {
+  list-style: disc;
+  margin-left: 20px;
+  padding: 0;
+}
+
+.achievements li {
+  font-size: 0.95em;
+  margin-bottom: 8px;
+  line-height: 1.6;
+}

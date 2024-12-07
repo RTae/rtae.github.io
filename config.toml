@@ -10,6 +10,8 @@ languageCode = "en-us"
   # Set the animation style -- https://animate.style/
   # To disable animations, please remove or comment animationStyle parameter
   animateStyle = "animated zoomIn fast" 
+  
+  customCSS = ["css/custom.css"]
 
   [[params.navlinks]]
   name = "about/"
