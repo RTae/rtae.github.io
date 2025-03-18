@@ -5,6 +5,6 @@ authors = "Punnarai Siricharoen,Supanut Tangsinmankong,Seree Yengsakulpaisal,Nat
 journal = "Journal of Food Engineering"
 status = "Accepted"
 date = 2024-12-01
-# external_url = "https://example.com/full-paper"
+external_url = "https://doi.org/10.1016/j.jfoodeng.2025.112535"
 
 +++
