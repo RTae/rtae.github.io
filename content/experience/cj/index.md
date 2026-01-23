@@ -4,7 +4,7 @@ title = "CJ Express Group Ltd."
 location = "Bangkok, Thailand"
 role = "Machine Learning Engineer"
 start_date = "2022-12"
-end_date = "Current"
+end_date = "2025-08"
 achievements = [
   "Developed a machine learning platform to allow AI researchers and data scientists to deploy models in cloud infrastructure using Google Cloud Provider, Kubernetes, Ray, and Crossplane.",
   "Optimized a computer vision model for checking stock arrangement using ONNX and parallel programming, handling 50 requests per second with CPU.",
