@@ -1,0 +1,233 @@
+%-------------------------------------
+% Resum in LaTeX (XeLaTeX)
+% Author:  HF Yuan
+% Project: https://github.com/xyz-yuanhf/yuan-resume
+% Base on: https://github.com/mattyHerzig/mattys_resume
+%          http://www.jianxu.net/en/
+% License: MIT
+%------------------------------------
+
+\documentclass[a4paper, 10pt]{article}
+\usepackage{myresume}  % Style package
+
+% --------------------  START  --------------------
+\begin{document}
+
+% -------------------- HEADING --------------------
+\begin{flushright}
+  \setstretch{0.6}
+  \item {\Calluna (+86) 18513106477, (+66) 0922638737}  % Phone number
+  \item {\Calluna panyx25@mails.tsinghua.edu.cn, natthanan.bhu@gmail.com}  % E-mail address
+  \item {\Calluna https://rtae.github.io}  % Home page
+\end{flushright}\vspace{-37pt}
+
+\begin{flushleft}  % Rplace here with your name (and identity if required)
+  {\Calluna \fontsize{20pt}{30pt}\selectfont \textsc{Natthanan Bhukan}} \quad
+  \noindent\rule{\textwidth}{0.4pt}
+\end{flushleft}
+
+% -------------------- EDUCATION --------------------
+\sectionBlock{
+\section{Education}
+}{
+
+\eduHeading
+  {Department of Computer Science and Technology, Tsinghua University}{Beijing, China}
+  {MSc. in Computer Science}{2025 - 2027}
+\itemListStart
+  \myItem{CSC Type A Scholarship : ACYLS}
+\itemListEnd
+
+\eduHeading
+  {Department of Computer Engineering, King Mongkut's University of Technology Thonburi}{Bangkok, Thailand}
+  {B.Eng. in Computer Engineering}{2018 - 2022}
+\itemListStart
+  \myItem{GPA: 3.82/4.00, First-class honor}
+  \myItem{Ranked 500-550 in Engineering and Technology by \textbf{QS Rankings}}
+\itemListEnd
+
+}
+
+% -------------------- Research Experience --------------------
+\sectionBlock{
+\section{Research Experience}
+}{
+\eduHeading
+  {Department of Computer Science and Technology, Tsinghua University}{Beijing, China}
+  {Graduate Researcher student}{2025.10 - Currently}
+\itemListStart
+  \myItem{Working under the supervision of Prof. Jidong Zhai to develop efficient system support to optimize AI applications within the system and algorithm. Currently, particularly interested in AI for Science.}
+\itemListEnd
+
+\eduHeading
+  {Department of Computer Engineering, Chulalongkorn University}{Bangkok, Thailand}
+  {Tuna Defect Classification and Grading using Twins Transformer}{2022.07 - 2022.12}
+\itemListStart
+  \myItem{Worked with Dr. Punnarai Siricharoen to optimize the transformer model by using the ONNX framework and deploying it in cloud infrastructure. With an optimization framework, the model infers faster by 15 percent.}
+  \myItem{Designed a system that handles a large load from the tund grading machine by using the publish-subscribe pattern. As a result, this system handles 30 requests per second with only 4 CPU cores.}
+\itemListEnd
+
+\eduHeading
+  {Department of Computer Engineering, King Mongkut's University of Technology Thonburi}{Bangkok, Thailand}
+  {Software for reading digital measurement tools and managing data.}{2021.08 - 2022.05}
+\itemListStart
+  \myItem{Worked with Dr. Kharittha Jangsamsi, King Mongkut’s University of Technology Thonburi, and Mr. Anuwat Chamnan, Dynamic Intelligence Asia, who were advisors on this project}
+  \myItem{My main responsibility was designing and optimizing a computer vision model to capture data from measurement tools. As a result, the model's inference speed improved from around 1000 ms to nearly 400 ms on mobile devices by using NCNN framework and custom pre-process logic with C++.}
+\itemListEnd
+}
+
+% -------------------- Industry Experience --------------------
+\sectionBlock{
+\section{Industry Experience}
+}{
+\internHeading
+  {CJ Express Group Ltd.}{Bangkok, Thailand}{2022.12 - 2025.08}{Machine Learning Engineer}
+\itemListStart
+  \myItem{Developed a machine learning platform to allow AI researchers and data scientists to deploy machine learning in cloud infrastructure, enabling users to deploy new models from web applications. This system was implemented using Google Cloud Provider, Kubernetes, Ray, and Crossplane.}
+  \myItem{Optimized a computer vision model for checking whether stock arrangement on the shelf is correct by using ONNX and parallel programming, which was deployed in Google Cloud Provider with a publish-subscribe pattern. As a result, this system handled 50 requests per second with CPU only.}
+  \myItem{Developed an end-to-end machine learning pipeline for a route optimization system in the logistics platform.As a result, the system reduced costs by about 10 percent per year by using GCP Workflow, Batch Service, and Pub/Sub.}
+\itemListEnd
+\internHeading
+  {Dynamic Intelligence Asia}{Bangkok, Thailand}{2022.06 - 2022-11}{AI Engineer}
+\itemListStart
+  \myItem{Developed computer vision model that inference in real time to detect human satey from the camera's factory by publish-subscribe pattern. Also, deploy model with TensorRT and preprocess with CUDA to maximize GPU utilization increasing speed performance by 2 times}
+  \myItem{Developed and set up infrastructure for the AI Computer Vision model for solving a business problem by using Docker, Terraform, and GitLab CI/CD, which these tools implement based on the DevOps concept by using Azure cloud provider.}
+\itemListEnd
+}
+
+
+% -------------------- PUBLICATIONS --------------------
+\sectionBlock{
+\section{Publications}
+}{
+\pubListStart
+\justifying
+\item Punnarai Siricharoen, Supanut Tangsinmankong, Seree Yengsakulpaisal, \textbf{Natthanan Bhukan}, Wisawapan Soingoen, Yutthana Lila, Saranya Jongaroontaprangsee, Stefan Mairhofer. \textit{Tuna Defect Classification and Grading using Twins Transformer}. To appear in Journal of Food Engineering, \underline{Published} (10.1016/j.jfoodeng.2025.112535).
+\pubListEnd
+}
+
+
+% -------------------- AWARDS & HONORS --------------------
+\sectionBlock{
+\section{Awards\\and\\Honors}
+}{
+\awardListStart
+\justifying
+\item \emph{Qualified for level two in Super AI Engineer (Season One)}, Artificial Intelligence Association of Thailand \hfill 2020.12
+\item \emph{The first place of Thai MNIST Classification in Super AI Engineer Level One (Season One)}, Artificial Intelligence Association of Thailand \hfill 2020.11
+\item \emph{First round pass with SayHouse : Monitoring and forecast utility usage by using RNN}, National Software Contest 2020 \hfill 2020.01
+\item \emph{Department of Computer engineering Scholarship}, King Mongkut's University of Technology Thonburi \hfill 2018 - 2022
+\awardListEnd
+}
+
+% -------------------- Public speaking event --------------------
+\sectionBlock{
+\section{Public speaking event}
+}{
+\awardListStart
+\justifying
+\item \emph{Explore the Power of KubeRay on Google Kubernetes Engine}, Google DevFest Cloud Bangkok 2024 \hfill 2024.11
+\item \emph{Monitoring and Observability in LLM Application}, GenAI Engineer Thailand \hfill 2022.06
+\item \emph{Leveraging Ray and Vertex AI for LLMOps}, Google DevFest Cloud Bangkok 2023 \hfill 2023.12
+\awardListEnd
+}
+
+% -------------------- Certificate --------------------
+\sectionBlock{
+\section{Certificate}
+}{
+\awardListStart
+\justifying
+\item \emph{Certified Kubernetes Application Developer}, The linux foundation \hfill 2024.09
+\item \emph{Professional Cloud Architect}, Google cloud, \hfill 2023.12
+\item \emph{Computer vision nano degree}, Udacity \hfill 2021.07
+\awardListEnd
+}
+
+% -------------------- PROJECTS --------------------
+\sectionBlock{
+\section{Projects}
+}{
+\projHeading
+{\textbf{Side project about CUDA programming}}
+{YOLOv11 with CUDA and TensorRT} {2022.06 - 2022.12}
+\itemListStart
+  \myItem{Built a high-performance implementation of YOLOv11 object detection using TensorRT for inference acceleration and leveraging CUDA for preprocessing.}
+  \myItem{Using CUDA programming to create a preprocessing logic with CUDA streams and threading which each input file process on separate CUDA streams. As a result, the process run faster to 20 ms (4 times faster)}
+\itemListEnd
+
+\vspace{4pt}
+\projHeading
+{\textbf{A open-source contributor at Langfuse}}
+{Langfuse: Open Source LLM Engineering Platform} {2020.08 - 2020.12}
+\itemListStart
+  \myItem{Added KeyCloak authenticate option for Langfuse}
+  \myItem{Deployed into production at version 2.93.3}
+\itemListEnd
+
+\vspace{4pt}
+\projHeading
+{\textbf{CPE327 Software Engineer} with Dr. Phond Phunchongharn and Dr. Khajonpong Akkarajitsakul}
+{Stylelearn : A learning platform which their own desire} {2020.08 - 2020.12}
+\itemListStart
+  \myItem{Developed a online learning web application by NextJS and NestJs.}
+  \myItem{Also, this project was implemented by using Software Development Lifecycle (SDLC) concept to develop a project }
+\itemListEnd
+
+\vspace{4pt}
+\projHeading
+{\textbf{Google Hackathon}}
+{WhereToBin: An AI-driven system for classifying garbage} {2020.08 - 2020.12}
+\itemListStart
+  \myItem{Developed a computer vision model that can classify garbade by using YOLOv3}
+  \myItem{Optimized and deployed the model by using TensorFlow.js, reducing the latency of the inference time from 1500 ms to 1000 ms}
+\itemListEnd
+}
+
+% -------------------- Other Experience --------------------
+\sectionBlock{
+\section{Other Experience}
+}{
+\internHeading
+  {King Mongkut's University of Technology Thonburi}{Bangkok, Thailand}{2022.01 - 2022.05}{Teaching Assistant in image processing and computer vision (CPE463)}
+\itemListStart
+  \myItem{Helped students to clarify their questions from lectures}
+  \myItem{Was a lab advisor in each class}
+\itemListEnd
+
+\internHeading
+  {Dynamic Intelligence Asia}{Bangkok, Thailand}{2021.01 - 2021-07}{AI Engineer (Internship)}
+\itemListStart
+  \myItem{Developed a computer vision model for the quality assurance production line in the car engine industry.}
+  \myItem{Developed service and infrastructure for in-house face recognition platform.}
+  \myItem{Help company to pass ISO 29110 (Software Engineering-Lifecycle Profiles for Very Small Enterprises (VSE)) audit}
+\itemListEnd
+
+\internHeading
+  {Botnoi Consulting Co. Ltd.}{Bangkok, Thailand}{2020.06 - 2020.12}{Teacher assitance for Data Science Essential class}
+\itemListStart
+  \myItem{Helped students in the class to provide a suggestion for a project each week}
+  \myItem{Answered questions and clarified misunderstandings for students}
+  \myItem{Classes Topics : 1. Data Analytics 2. Machine Learning 3. Prediction Models 4. Trend Forecasting 5. Customer segmentation 6. Contextual and Personalized Marketing 7. Recommendation system 8. Anomaly and Fraud Detection}
+\itemListEnd
+}
+
+% -------------------- Community Involvement --------------------
+\sectionBlock{
+\section{Community Involvement}
+}{
+\internHeading
+  {KMUTT BangMod Hackathon}{Bangkok, Thailand}{2021.10}{Backend Developer for a programming competition platform}
+\itemListStart
+  \myItem{Developed a programming competition platform in Go (Golang)}
+\itemListEnd
+
+\internHeading
+  {KMUTT RC Volunteer Club}{Bangkok, Thailand}{2020.01}{Leader Modpa ViVa Rasa 1}
+\itemListStart
+  \myItem{As a project leader, I managed a team to organize a wildfire protection camp project and successfully raised 550 USD from the public to support the initiative.}
+\itemListEnd
+}
+
+\end{document}
+

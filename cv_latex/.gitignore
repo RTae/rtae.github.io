@@ -1,0 +1,21 @@
+# Latex ignore file
+*.aux
+*.lof
+*.log
+*.lot
+*.fls
+*.out
+*.toc
+*.fmt
+*.fot
+*.cbl
+*.cb2
+*.lb
+*.bbl
+*.bcf
+*.run.xml
+*.fdb_latexmk
+*.synctex.gz
+*.nav
+*.snm
+*.vrb
