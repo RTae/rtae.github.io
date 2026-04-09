@@ -1,4 +1,4 @@
-baseurl = "https://rtae.github.io"
+baseurl = "https://www.rtae.tech/"
 title = "Natthanan Bhukan"
 theme = "hugo-theme-console"
 languageCode = "en-us"
