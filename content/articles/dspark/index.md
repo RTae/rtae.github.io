@@ -1,7 +1,6 @@
 +++
 title = "DSpark: when speculative decoding starts caring about your batch"
 date = "2026-08-03"
-draft = true
 +++
 
 Most speculative decoding papers optimize a number that does not survive contact with a production serving system: tokens accepted per request, measured at batch size one. DSpark is interesting because it optimizes the thing you actually get billed for — throughput under concurrency — and in doing so it treats draft length as a scheduling decision rather than a hyperparameter.
