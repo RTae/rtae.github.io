@@ -2,8 +2,17 @@ baseurl = "https://www.rtae.tech/"
 title = "Natthanan Bhukan"
 theme = "hugo-theme-console"
 languageCode = "en-us"
+enableRobotsTXT = true
 
 [params]
+  author = "Natthanan Bhukan"
+  jobTitle = "Machine Learning Engineer"
+  description = "Natthanan Bhukan — machine learning engineer working on LLM serving, inference optimisation, and MLOps infrastructure."
+  # sameAs feeds the Person JSON-LD on the home page; add/remove profiles freely.
+  sameAs = [
+    "https://github.com/RTae",
+    "https://medium.com/@RTae",
+  ]
   # Cutting off the page title to two chars for mobile (console-demo -> co)
   titleCutting = true
 

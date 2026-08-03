@@ -1,0 +1,52 @@
+{{- /*
+  Overrides the theme's opengraph partial.
+  Only change vs. upstream: og:description falls back to the page summary
+  instead of the site-wide description, so every page gets a distinct snippet.
+*/ -}}
+{{- $desc := "" -}}
+{{- with .Description -}}
+  {{- $desc = . -}}
+{{- else -}}
+  {{- if .IsPage -}}
+    {{- $desc = .Summary | plainify | truncate 200 -}}
+  {{- else -}}
+    {{- $desc = .Site.Params.description -}}
+  {{- end -}}
+{{- end -}}
+<meta property="og:title" content="{{ if .IsHome }}{{ .Site.Title }}{{ else }}{{ .Title }}{{ end }}" />
+<meta property="og:description" content="{{ $desc | plainify | chomp }}" />
+<meta property="og:type" content="{{ if .IsPage }}article{{ else }}website{{ end }}" />
+<meta property="og:url" content="{{ .Permalink }}" />
+<meta property="og:locale" content="{{ .Site.LanguageCode }}" />
+{{- with .Site.Title }}
+<meta property="og:site_name" content="{{ . }}" />
+{{- end }}
+
+{{- /* Page-bundle image first, then a site-wide fallback in static/ */}}
+{{- $img := "" -}}
+{{- with .Params.image -}}
+  {{- with $.Resources.GetMatch . -}}
+    {{- $img = (.Resize "1200x").Permalink -}}
+  {{- end -}}
+{{- end -}}
+{{- if not $img -}}
+  {{- with .Site.Params.defaultImage -}}
+    {{- $img = . | absURL -}}
+  {{- end -}}
+{{- end -}}
+{{- with $img }}
+<meta property="og:image" content="{{ . }}" />
+{{- end }}
+
+{{- $iso8601 := "2006-01-02T15:04:05-07:00" -}}
+{{- if .IsPage }}
+{{- if not .PublishDate.IsZero }}
+<meta property="article:published_time" {{ .PublishDate.Format $iso8601 | printf "content=%q" | safeHTMLAttr }} />
+{{- else if not .Date.IsZero }}
+<meta property="article:published_time" {{ .Date.Format $iso8601 | printf "content=%q" | safeHTMLAttr }} />
+{{- end }}
+<meta property="article:section" content="{{ .Section }}" />
+{{- with .Params.tags }}{{ range first 6 . }}
+<meta property="article:tag" content="{{ . }}" />
+{{- end }}{{ end }}
+{{- end }}

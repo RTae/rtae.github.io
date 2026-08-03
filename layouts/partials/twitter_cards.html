@@ -1,0 +1,35 @@
+{{- /*
+  Overrides the theme's twitter_cards partial.
+  Changes vs. upstream: always emit a card type (upstream emitted none without
+  an image), and fall back to the site-wide image.
+*/ -}}
+{{- $desc := "" -}}
+{{- with .Description -}}
+  {{- $desc = . -}}
+{{- else -}}
+  {{- if .IsPage -}}
+    {{- $desc = .Summary | plainify | truncate 200 -}}
+  {{- else -}}
+    {{- $desc = .Site.Params.description -}}
+  {{- end -}}
+{{- end -}}
+{{- $img := "" -}}
+{{- with .Params.image -}}
+  {{- with $.Resources.GetMatch . -}}
+    {{- $img = (.Resize "1200x").Permalink -}}
+  {{- end -}}
+{{- end -}}
+{{- if not $img -}}
+  {{- with .Site.Params.defaultImage -}}
+    {{- $img = . | absURL -}}
+  {{- end -}}
+{{- end -}}
+<meta name="twitter:card" content="{{ if $img }}summary_large_image{{ else }}summary{{ end }}"/>
+<meta name="twitter:title" content="{{ if .IsHome }}{{ .Site.Title }}{{ else }}{{ .Title }}{{ end }}"/>
+<meta name="twitter:description" content="{{ $desc | plainify | chomp }}"/>
+{{- with $img }}
+<meta name="twitter:image" content="{{ . }}"/>
+{{- end }}
+{{- with .Site.Params.Social.twitter }}
+<meta name="twitter:site" content="@{{ . }}"/>
+{{- end }}
