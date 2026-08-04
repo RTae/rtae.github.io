@@ -23,13 +23,12 @@
     </p>
   </div>
 
-  {{- /* Bio lives in content/about, not here. The home page shows the summary
-         (everything above <!--more-->) and links onward, so there is one source
-         of truth and the two pages do not serve identical text. */ -}}
+  {{- /* Bio lives in content/about/index.md and nowhere else. Both this page
+         and /about/ render it in full from that one file, so editing the bio
+         means editing content, never a template. */ -}}
   <div style="margin-top: 0; margin-left: 20px;">
     {{ with .Site.GetPage "/about" }}
-      {{ .Summary }}
-      <p><a href="{{ .Permalink }}">More about me &rarr;</a></p>
+      {{ .Content }}
     {{ end }}
   </div>
 </div>
