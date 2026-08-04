@@ -1,4 +1,97 @@
-/* Picked up by the theme's baseof via resources.Get "css/custom.css". */
+/* Picked up by the theme's baseof via resources.Get "css/custom.css".
+   Loaded last, so declarations here win over the theme's console.css. */
+
+/* ---------------------------------------------------------------------------
+   Fonts
+
+   The theme ships four raw .ttf faces (468 KB). These are the same faces
+   subsetted and re-encoded as WOFF2 (104 KB), covering Latin-1, Greek, general
+   punctuation, sub/superscripts, arrows and maths operators — every non-ASCII
+   character used anywhere in content, verified against the originals.
+
+   A distinct family name is used rather than redefining "Roboto Mono", so the
+   theme's own @font-face rules are simply never matched and its .ttf files are
+   never fetched.
+--------------------------------------------------------------------------- */
+@font-face {
+    font-family: "Roboto Mono Subset";
+    src: url("/fonts/RobotoMono-Regular.woff2") format("woff2");
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "Roboto Mono Subset";
+    src: url("/fonts/RobotoMono-Italic.woff2") format("woff2");
+    font-style: italic;
+    font-weight: 400;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "Roboto Mono Subset";
+    src: url("/fonts/RobotoMono-Bold.woff2") format("woff2");
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "Roboto Mono Subset";
+    src: url("/fonts/RobotoMono-BoldItalic.woff2") format("woff2");
+    font-style: italic;
+    font-weight: 700;
+    font-display: swap;
+}
+
+:root {
+    --mono-font-stack: "Roboto Mono Subset", Menlo, Monaco, Lucida Console,
+        Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono,
+        Courier New, monospace, serif;
+    --font-stack: var(--mono-font-stack);
+}
+
+/* ---------------------------------------------------------------------------
+   Animation
+
+   Replaces animate.css (71 KB) with the one effect the site configures via
+   params.animateStyle = "animated zoomIn fast".
+--------------------------------------------------------------------------- */
+@keyframes zoomIn {
+    from {
+        opacity: 0;
+        transform: scale3d(0.3, 0.3, 0.3);
+    }
+    50% {
+        opacity: 1;
+    }
+}
+
+.animated {
+    animation-duration: 1s;
+    animation-fill-mode: both;
+}
+
+.animated.fast {
+    animation-duration: 800ms;
+}
+
+.animated.zoomIn {
+    animation-name: zoomIn;
+}
+
+/* Honour a reduced-motion preference. animate.css did this too. */
+@media (prefers-reduced-motion: reduce) {
+    .animated {
+        animation: none !important;
+        transition: none !important;
+    }
+}
+
+/* ---------------------------------------------------------------------------
+   Links out, article metadata
+--------------------------------------------------------------------------- */
 
 /* Arrow appended to titles that lead off-site. */
 .external-marker {
@@ -39,4 +132,85 @@
 .post-tags a {
     margin-right: 0.75em;
     white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------------------
+   Headings
+
+   Section headings demoted from h1 to h2 so each page has a single h1. These
+   rules carry the theme's h1 presentation across so the change is structural
+   only, with no visible difference.
+--------------------------------------------------------------------------- */
+/* Mirrors the theme's own h1 rules, including the "====" underline it draws
+   with h1::after, so a demoted section heading is visually identical. */
+.section-heading {
+    position: relative;
+    display: table-cell;
+    padding: calc(var(--global-space) * 2) 0;
+    margin: 0;
+    overflow: hidden;
+    font-weight: 600;
+    margin-bottom: 150px;
+}
+
+.section-heading::after {
+    content: "====================================================================================================";
+    position: absolute;
+    bottom: 5px;
+    left: 0;
+    display: var(--display-h1-decoration);
+}
+
+.section-heading + * {
+    margin-top: 0;
+}
+
+/* List-item titles sit inside .post / .experience-item and must stay compact,
+   overriding the large section spacing above. The theme renders every heading
+   at the base font size, so these keep 1em rather than scaling up. */
+.post h1,
+.post h2,
+.post h3,
+.experience-item h2,
+.experience-item h3 {
+    padding-top: 0;
+    margin: 0 0 5px 0;
+    font-size: var(--global-font-size);
+}
+
+/* Item headings must not inherit the section heading's table-cell/underline. */
+.post h2::after,
+.post h3::after,
+.experience-item h3::after {
+    content: none;
+}
+
+.experience-item h3 {
+    font-weight: normal;
+}
+
+/* ---------------------------------------------------------------------------
+   Inline icons (replacing jsDelivr / Wikimedia hotlinks)
+--------------------------------------------------------------------------- */
+.icon-link {
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.icon-link svg {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    /* currentColor makes these adapt to light/dark automatically, which the
+       old CDN images needed a filter hack to fake. */
+    fill: currentColor;
+}
+
+/* Replaces the <p> that used to wrap each list entry (a <p> may not contain
+   <div> or headings). Keeps the block margins the paragraph provided. */
+.post-entry {
+    margin-block: 1em;
 }

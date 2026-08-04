@@ -12,16 +12,17 @@
         {{- $ext := .Params.external_url -}}
         {{- $href := or $ext .Permalink -}}
         <div class="post">
-            <p>
+            <div class="post-entry">
                 <div class="date">{{ .PublishDate.Format "Jan. 2, 2006" }}</div>
-                <h1>
+                {{- /* h2: the page title above is the only h1 on this page. */ -}}
+                <h2>
                     <a href="{{ $href }}"
                        title="{{ .Title }}"
                        {{ with $ext }}target="_blank" rel="noopener"{{ end }}>{{ .Title }}</a>{{ with $ext }} <span class="external-marker" aria-hidden="true">&#8599;</span>{{ end }}
-                </h1>
+                </h2>
                 {{ with $ext }}<span class="external-host">{{ (urls.Parse .).Host }}</span>{{ end }}
                 {{ .Summary }}
-            </p>
+            </div>
         </div>
     {{ end }}
 {{ end }}

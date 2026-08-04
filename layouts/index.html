@@ -1,41 +1,40 @@
 {{ define "main" }}
-<h1>About</h1>
-<br>
-<h2>Natthanan Bhukan</h2>
+{{- /* The single h1 for this page. Everything below is a section (h2) and list
+       items within those are h3, so the outline is one coherent tree. */ -}}
+<h1>{{ .Site.Title }}</h1>
 <div style="display: flex; align-items: flex-start; gap: 10px;">
   <!-- Your Image and Social Links -->
   <div style="flex-shrink: 0; text-align: left;">
     <img src="/images/my-image.jpg" alt="Natthanan Bhukan" style="width: 150px; height: auto; margin-bottom: 10px;">
+    {{- /* Icons are inlined from assets/icons at build time: no third-party
+           requests, and fill:currentColor adapts to light/dark on its own. */ -}}
     <p style="margin-top: 10px;">
-      <!-- GitHub Icon -->
-      <a href="https://github.com/RTae" target="_blank" title="GitHub" style="text-decoration: none; display: block; margin-bottom: 10px;">
-        <img class="github-icon" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/github/github-original.svg" alt="GitHub" style="width: 24px; height: 24px; vertical-align: middle;"> GitHub
+      <a class="icon-link" href="https://github.com/RTae" target="_blank" rel="noopener" title="GitHub">
+        {{ with resources.Get "icons/github.svg" }}{{ .Content | safeHTML }}{{ end }}<span>GitHub</span>
       </a>
 
-      <!-- LinkedIn Icon -->
-      <a href="https://www.linkedin.com/in/natthananbhukan/" target="_blank" title="LinkedIn" style="text-decoration: none; display: block; margin-bottom: 10px;">
-        <img class="linkedin-icon" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/linkedin/linkedin-original.svg" alt="Linkedin" style="width: 24px; height: 24px; vertical-align: middle;"> LinkedIn
+      <a class="icon-link" href="https://www.linkedin.com/in/natthananbhukan/" target="_blank" rel="noopener" title="LinkedIn">
+        {{ with resources.Get "icons/linkedin.svg" }}{{ .Content | safeHTML }}{{ end }}<span>LinkedIn</span>
       </a>
 
-      <a href="/files/cv_natthanan.pdf" target="_blank" title="CV" style="text-decoration: none; display: block; margin-top: 10px;">
-        <img src="https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg" alt="CV" style="width: 24px; height: 24px; vertical-align: middle;"> CV
+      <a class="icon-link" href="/files/cv_natthanan.pdf" target="_blank" rel="noopener" title="CV">
+        {{ with resources.Get "icons/pdf.svg" }}{{ .Content | safeHTML }}{{ end }}<span>CV</span>
       </a>
     </p>
   </div>
 
-  <!-- Introduction Text -->
+  {{- /* Bio lives in content/about, not here. The home page shows the summary
+         (everything above <!--more-->) and links onward, so there is one source
+         of truth and the two pages do not serve identical text. */ -}}
   <div style="margin-top: 0; margin-left: 20px;">
-    <!-- Name and Title -->
-    <p>
-      Hi there 🌟, my name is Natthanan Bhukan, or you can call me "Tae". Currently, I'm working as a graduate researcher student at Tsinghua University, under the supervision of Prof. Jidong Zhai.
-    </p>
-    <p>
-      My research interests focus on developing efficient system support to optimize AI applications within the system and algorithm. Currently, I'm particularly interested in AI for Science.
-    </p>
+    {{ with .Site.GetPage "/about" }}
+      {{ .Summary }}
+      <p><a href="{{ .Permalink }}">More about me &rarr;</a></p>
+    {{ end }}
   </div>
 </div>
 
-<h1>Research Papers</h1>
+<h2 class="section-heading">Research Papers</h2>
 <ul class="styled-list">
   {{ with .Site.GetPage "/research-papers" }}
     {{ range (sort .Pages "Date" "desc") }}
@@ -62,15 +61,15 @@
 </ul>
 
 
-<h1>Experience</h1>
+<h2 class="section-heading">Experience</h2>
 <ul class="styled-list">
   {{ with .Site.GetPage "/experience" }}
     {{ range (sort .Pages "Params.start_date" "desc") }}
       <li>
         <div class="experience-item">
-          <h2>
+          <h3>
             <span class="title">{{ .Title }}</span> | {{ .Params.location }} | {{ .Params.start_date }} to {{ if .Params.end_date }}{{ .Params.end_date }}{{ else }}Current{{ end }}
-          </h2>
+          </h3>
           <p class="role"><strong>{{ .Params.role }}</strong></p>
           <ul class="achievements">
             {{ range .Params.achievements }}
@@ -83,23 +82,23 @@
   {{ end }}
 </ul>
 
-<h1>Awards and Honors</h1>
+<h2 class="section-heading">Awards and Honors</h2>
 <div class="posts-list">
 {{ with .Site.GetPage "/awards" }}
     {{ range first 4 (sort .Data.Pages "Date" "desc" (where .Pages ".Params.private" "!=" true))}}
         <div class="experience-item">
-            <p>
+            <div class="post-entry">
                 <div class="date">{{ .PublishDate.Format "01-2006" }}</div>
-                <h2>
+                <h3>
                   <span class="title">{{ .Title }}</span>, {{ .Params.location }}
-                </h2>
-            </p>
+                </h3>
+            </div>
         </div>
     {{ end }}
 {{ end }}
 </div>
 
-<h1>Articles</h1>
+<h2 class="section-heading">Articles</h2>
 <div class="posts-list">
 {{ with .Site.GetPage "/articles" }}
     {{ range first 4 (sort .Data.Pages "Date" "desc" (where .Pages ".Params.private" "!=" true))}}
@@ -107,47 +106,47 @@
                so the link never renders empty (an empty href reloads this page). */ -}}
         {{- $ext := .Params.external_url -}}
         <div class="post">
-            <p>
+            <div class="post-entry">
                 <div class="date">{{ .PublishDate.Format "01-2006" }}</div>
-                <h1><a href="{{ or $ext .Permalink }}" title="{{ .Title }}"
+                <h3><a href="{{ or $ext .Permalink }}" title="{{ .Title }}"
                        {{- with $ext }} target="_blank" rel="noopener"{{ end }}>{{ .Title }}</a>
-                    {{- with $ext }} <span class="external-marker" aria-hidden="true">&#8599;</span>{{ end }}</h1>
+                    {{- with $ext }} <span class="external-marker" aria-hidden="true">&#8599;</span>{{ end }}</h3>
                 {{ .Summary }}
-            </p>
+            </div>
         </div>
     {{ end }}
 {{ end }}
 </div>
 
-<h1>Public speaking events</h1>
+<h2 class="section-heading">Public speaking events</h2>
 <div class="posts-list">
 {{ with .Site.GetPage "/events" }}
     {{ range first 4 (sort .Data.Pages "Date" "desc" (where .Pages ".Params.private" "!=" true))}}
         <div class="post">
-            <p>
+            <div class="post-entry">
                 <div class="date">{{ .PublishDate.Format "01-2006" }}</div>
-                <h1><a href="{{ .Permalink }}" title="{{ .Title }}">{{ .Title }}</a></h1>
+                <h3><a href="{{ .Permalink }}" title="{{ .Title }}">{{ .Title }}</a></h3>
                 {{ .Summary }}
-            </p>
+            </div>
         </div>    
     {{ end }}
 {{ end }}
 </div>
 
-<h1>Projects</h1>
+<h2 class="section-heading">Projects</h2>
 <div class="posts-list">
 {{ with .Site.GetPage "/projects" }}
     {{ range first 4 (sort .Data.Pages "Date" "desc" (where .Pages ".Params.private" "!=" true))}}
         <div class="post">
-            <p>
+            <div class="post-entry">
                 <div class="date">{{ .PublishDate.Format "01-2006" }}</div>
-                <h1><a href="{{ .Permalink }}" title="{{ .Title }}">{{ .Title }}</a></h1>
+                <h3><a href="{{ .Permalink }}" title="{{ .Title }}">{{ .Title }}</a></h3>
                 {{ .Summary }}
-            </p>
+            </div>
             {{ if .Params.github }}
                 <p>
-                    <a href="{{ .Params.github }}" target="_blank" title="GitHub Repository">
-                        <img class="github-icon" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/github/github-original.svg" alt="GitHub"> Repository
+                    <a class="icon-link" href="{{ .Params.github }}" target="_blank" rel="noopener" title="GitHub Repository">
+                        {{ with resources.Get "icons/github.svg" }}{{ .Content | safeHTML }}{{ end }}<span>Repository</span>
                     </a>
                 </p>
             {{ end }}
@@ -174,7 +173,7 @@
 }
 
 .paper-title a {
-  color: #007bff;
+  color: var(--primary-color);
   text-decoration: none;
 }
 
@@ -183,11 +182,11 @@
 }
 
 .paper-title span {
-  color: #222;
+  color: var(--secondary-color);
   font-style: italic; /* Optional styling for "under review" text */
 }
 
-.experience-item h2 {
+.experience-item h3 {
   font-weight: normal; /* Bold styling for the Title (company name) */
   margin: 5px 0;
 }
@@ -198,7 +197,7 @@
 
 .role {
   font-size: 1em;
-  color: #333;
+  color: var(--font-color);
   margin: 10px 0;
 }
 
@@ -214,30 +213,7 @@
   line-height: 1.6;
 }
 
-/* Default icon styling */
-.github-icon {
-  width: 24px;
-  height: 24px;
-  vertical-align: middle;
-  transition: filter 0.3s ease;
-}
-
-/* Apply a filter for GitHub icon in dark mode */
-@media (prefers-color-scheme: dark) {
-  .github-icon {
-    filter: invert(100%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(200%) contrast(100%);
-  }
-}
-
-/* Default LinkedIn styling (no changes for dark mode) */
-.linkedin-icon {
-  width: 24px;
-  height: 24px;
-  vertical-align: middle;
-}
 </style>
 
-  
-</style>
   
 {{ end }}

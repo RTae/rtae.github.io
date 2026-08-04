@@ -7,19 +7,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     {{- /* robots/googlebot are emitted by seo.html, which varies them per page. */ -}}
     {{- partial "seo.html" . -}}
+    {{- /* Preload the two faces used above the fold so text paints without a
+           second round-trip after the CSS resolves. */ -}}
+    <link rel="preload" href="{{ "fonts/RobotoMono-Regular.woff2" | absURL }}" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="{{ "fonts/RobotoMono-Bold.woff2" | absURL }}" as="font" type="font/woff2" crossorigin>
     <link rel="stylesheet" href="{{ "hugo-theme-console/css/terminal-0.7.4.min.css" | absURL }}">
-    <link rel="stylesheet" href="{{ "hugo-theme-console/css/animate-4.1.1.min.css" | absURL }}">
     <link rel="stylesheet" href="{{ "hugo-theme-console/css/console.css" | absURL }}">
+    {{- /* animate.css (71 KB) is replaced by the keyframes in custom.css, and
+           the IE9 shims pointed at oss.maxcdn.com, which no longer exists. */ -}}
     {{ with resources.Get "css/custom.css" }}
       {{ $css := . | minify | fingerprint }}
       <link rel="stylesheet" href="{{ $css.RelPermalink }}" integrity="{{ $css.Data.Integrity }}">
     {{ end }}
-    {{ `
-      <!--[if lt IE 9]>
-          <script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
-          <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
-      <![endif]-->
-    ` | safeHTML }}
 
     {{- partial "favicon.html" . -}}
     {{ with .OutputFormats.Get "RSS" }}
