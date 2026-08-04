@@ -1,0 +1,13 @@
+{{ define "main" }}
+<h1>{{ .Title }}</h1>
+{{ .Content }}
+
+{{- /* Stub pages for posts hosted elsewhere: give the reader somewhere to go.
+       Canonical for these points at the external host (see partials/seo.html),
+       so the stub is a signpost, not a competing copy of the article. */ -}}
+{{- with .Params.external_url }}
+<p class="external-cta">
+    &rarr; <a href="{{ . }}" target="_blank" rel="noopener">Read the full article on {{ (urls.Parse .).Host | replaceRE "^www\\." "" }}</a>
+</p>
+{{- end }}
+{{ end }}

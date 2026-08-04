@@ -1,0 +1,30 @@
+{{ define "main" }}
+<h1>{{ .Page.Title }}</h1>
+<br/>
+{{ .Content }}
+
+<div class="posts-list">
+{{ range sort .Pages "Date" "desc" }}
+    {{ if not .Params.private }}
+        {{- /* Posts that live elsewhere (Medium, a journal) link straight out.
+               Keeps readers one click from the real article instead of landing
+               on a stub, and stops those stubs reading as thin content. */ -}}
+        {{- $ext := .Params.external_url -}}
+        {{- $href := or $ext .Permalink -}}
+        <div class="post">
+            <p>
+                <div class="date">{{ .PublishDate.Format "Jan. 2, 2006" }}</div>
+                <h1>
+                    <a href="{{ $href }}"
+                       title="{{ .Title }}"
+                       {{ with $ext }}target="_blank" rel="noopener"{{ end }}>{{ .Title }}</a>{{ with $ext }} <span class="external-marker" aria-hidden="true">&#8599;</span>{{ end }}
+                </h1>
+                {{ with $ext }}<span class="external-host">{{ (urls.Parse .).Host }}</span>{{ end }}
+                {{ .Summary }}
+            </p>
+        </div>
+    {{ end }}
+{{ end }}
+</div>
+
+{{ end }}

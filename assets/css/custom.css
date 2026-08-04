@@ -1,0 +1,23 @@
+/* Picked up by the theme's baseof via resources.Get "css/custom.css". */
+
+/* Arrow appended to titles that lead off-site. */
+.external-marker {
+    color: var(--secondary-color);
+    font-size: 0.8em;
+    vertical-align: super;
+}
+
+/* Host label under an outbound title, e.g. "medium.com". */
+.external-host {
+    display: block;
+    color: var(--secondary-color);
+    font-size: 0.8em;
+    margin-bottom: 4px;
+}
+
+/* "Read the full article on ..." link on a stub page. */
+.external-cta {
+    margin-top: 2em;
+    padding-top: 1em;
+    border-top: 1px solid var(--secondary-color);
+}

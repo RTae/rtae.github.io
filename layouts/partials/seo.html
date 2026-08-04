@@ -15,7 +15,9 @@
   {{- end -}}
 {{- end -}}
 <meta name="description" content="{{ $desc | plainify | chomp }}">
-<link rel="canonical" href="{{ .Permalink }}">
+{{- /* Posts hosted elsewhere canonicalise to the original. The stub is a
+       signpost, so it must not compete with the real article in the index. */ -}}
+<link rel="canonical" href="{{ or .Params.external_url .Permalink }}">
 
 {{- with .Params.keywords }}
 <meta name="keywords" content="{{ delimit . ", " }}">
@@ -24,7 +26,8 @@
 {{- end }}{{- end }}
 
 {{- $iso := "2006-01-02T15:04:05-07:00" -}}
-{{- if and .IsPage (eq .Section "articles") }}
+{{- /* No BlogPosting markup on stubs — the canonical article is off-site. */ -}}
+{{- if and .IsPage (eq .Section "articles") (not .Params.external_url) }}
 <script type="application/ld+json">
 {{ dict
   "@context" "https://schema.org"
