@@ -2,7 +2,7 @@
 title = "DSpark: when speculative decoding starts caring about your batch"
 date = "2026-08-03"
 description = "A serving engineer's read of DSpark (arXiv:2607.05147) — how semi-autoregressive drafting fixes suffix decay, and why confidence-scheduled verification makes draft length a scheduling decision instead of a fixed hyperparameter."
-tags = ["speculative-decoding", "llm-inference", "llm-serving", "paper-review", "vllm", "mlops"]
+tags = ["llm-inference", "llm-serving", "paper-review"]
 +++
 
 Most speculative decoding papers optimize a number that does not survive contact with a production serving system: tokens accepted per request, measured at batch size one. DSpark is interesting because it optimizes the thing you actually get billed for — throughput under concurrency — and in doing so it treats draft length as a scheduling decision rather than a hyperparameter.
@@ -80,9 +80,14 @@ Three things I am taking from this paper.
 
 **Suffix decay is an architecture bug, not a budget problem.** The field's response to decaying acceptance has largely been to shorten blocks. DSpark's response is to add back the minimum dependency structure needed — one token of history, via a low-rank bias — at ~1% latency. Shortening the block treats the symptom.
 
-**Draft length belongs to the scheduler.** This is the part I expect to generalize beyond this specific drafter. Speculative decoding has been developed largely as a modeling problem and evaluated at batch size one, but in a real server the speculation budget competes with the batch for the same resource. Any system that fixes γ statically is leaving throughput on the floor at low load and burning capacity at high load. If you run vLLM or SGLang with speculative decoding enabled and a fixed `num_speculative_tokens`, that constant is wrong at almost every moment of the day.
+**Draft length belongs to the scheduler.** This is the part I expect to generalize beyond this specific drafter. Speculative decoding has been developed largely as a modeling problem and evaluated at batch size one, but in a real server the speculation budget competes with the batch for the same resource. Any system that fixes γ statically is leaving throughput on the floor at low load and burning capacity at high load. If you run [vLLM](/articles/vllm/) or SGLang with speculative decoding enabled and a fixed `num_speculative_tokens`, that constant is wrong at almost every moment of the day.
 
 **Calibration is infrastructure.** A confidence signal that is only a good ranker is fine for a threshold and actively harmful for a scheduler that multiplies probabilities into a survival estimate. The temperature-scaling step is three lines of conceptual weight and moves ECE from 8% to 1%. Worth remembering the next time a model's confidence output is used as an actual probability rather than a sort key.
+
+## Related reading
+
+- [How does vLLM optimize the LLM serving system?](/articles/vllm/) — continuous batching and paged attention, the layer underneath everything discussed here.
+- [Enhanced LLM Applications with Monitoring and Observability](/articles/langfuse/) — on measuring what your serving stack actually does in production.
 
 ---
 

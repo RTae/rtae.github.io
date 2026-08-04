@@ -3,6 +3,13 @@ title = "Natthanan Bhukan"
 theme = "hugo-theme-console"
 languageCode = "en-us"
 enableRobotsTXT = true
+# Derives Lastmod from git commit dates instead of front-matter `date`, so the
+# sitemap reflects real edits. Needs full history: the deploy workflow already
+# checks out with fetch-depth: 0.
+enableGitInfo = true
+
+# [services.googleAnalytics]
+#   ID = "G-XXXXXXXXXX"   # uncomment and fill in to enable the theme's GA tag
 
 [params]
   author = "Natthanan Bhukan"

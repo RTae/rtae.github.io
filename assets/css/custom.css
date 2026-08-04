@@ -21,3 +21,22 @@
     padding-top: 1em;
     border-top: 1px solid var(--secondary-color);
 }
+
+/* Date / byline / reading time under an article title. */
+.post-meta {
+    color: var(--secondary-color);
+    font-size: 0.85em;
+    margin-top: -0.5em;
+    margin-bottom: 2em;
+}
+
+/* Tag list at the foot of an article. */
+.post-tags {
+    margin-top: 2.5em;
+    font-size: 0.85em;
+}
+
+.post-tags a {
+    margin-right: 0.75em;
+    white-space: nowrap;
+}

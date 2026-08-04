@@ -1,0 +1,66 @@
+{{- /*
+  Renders a per-page social card at build time and returns its permalink.
+
+  Hugo's images.Text filter draws onto a raster canvas, so the output is a real
+  PNG — SVG is not rendered by X, LinkedIn, Facebook or Slack as an og:image.
+
+  images.Text has no line-wrapping option, so the title is wrapped here on word
+  boundaries. Roboto Mono is monospace with an advance width of ~0.6em, which
+  makes the characters-per-line calculation exact rather than a guess.
+*/ -}}
+{{- $base := resources.Get "images/og-base.png" -}}
+{{- $font := resources.Get "fonts/RobotoMono-Bold.ttf" -}}
+{{- $fontRegular := resources.Get "fonts/RobotoMono-Regular.ttf" -}}
+
+{{- if and $base $font -}}
+  {{- /* The kicker already carries the site name, so the home card leads with
+         the role instead of repeating it. */ -}}
+  {{- $title := printf "%s" (.Title | plainify) -}}
+  {{- if .IsHome -}}
+    {{- $title = printf "%s" (default .Title .Site.Params.jobTitle) -}}
+  {{- end -}}
+  {{- $kicker := printf "%s:~#" .Site.Title -}}
+  {{- $host := printf "%s" ((urls.Parse .Site.BaseURL).Host | replaceRE "^www\\." "") -}}
+  {{- $footer := $host -}}
+  {{- if .IsPage -}}
+    {{- $footer = printf "%s  ·  %s" (.Date.Format "Jan 2, 2006") $host -}}
+  {{- end -}}
+
+  {{- /* Shrink the face for long titles so the block stays on the canvas. */ -}}
+  {{- $size := 58 -}}
+  {{- if gt (len $title) 55 }}{{ $size = 46 }}{{ end -}}
+  {{- if gt (len $title) 85 }}{{ $size = 38 }}{{ end -}}
+
+  {{- $textWidth := 1050.0 -}}
+  {{- $maxChars := int (div $textWidth (mul (float $size) 0.6)) -}}
+
+  {{- /* Greedy word wrap. */ -}}
+  {{- $lines := slice -}}
+  {{- $current := "" -}}
+  {{- range (split $title " ") -}}
+    {{- $word := . -}}
+    {{- if eq $current "" -}}
+      {{- $current = $word -}}
+    {{- else if le (add (len $current) (add 1 (len $word))) $maxChars -}}
+      {{- $current = printf "%s %s" $current $word -}}
+    {{- else -}}
+      {{- $lines = $lines | append $current -}}
+      {{- $current = $word -}}
+    {{- end -}}
+  {{- end -}}
+  {{- if ne $current "" }}{{ $lines = $lines | append $current }}{{ end -}}
+  {{- $wrapped := delimit (first 4 $lines) "\n" -}}
+
+  {{- $img := $base.Filter
+      (images.Text $kicker (dict
+        "color" "#62c4ff" "size" 26 "x" 72 "y" 72 "font" $fontRegular))
+      (images.Text $wrapped (dict
+        "color" "#e8e9ed" "size" $size "linespacing" (int (mul (float $size) 0.5))
+        "x" 72 "y" 180 "font" $font))
+      (images.Text $footer (dict
+        "color" "#a3abba" "size" 24 "x" 72 "y" 540 "font" $fontRegular))
+  -}}
+  {{- $img.Permalink -}}
+{{- else -}}
+  {{- with .Site.Params.defaultImage }}{{ . | absURL }}{{ end -}}
+{{- end -}}

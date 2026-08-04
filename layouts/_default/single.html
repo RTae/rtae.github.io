@@ -1,13 +1,32 @@
 {{ define "main" }}
-<h1>{{ .Title }}</h1>
-{{ .Content }}
+<article>
+    <h1>{{ .Title }}</h1>
 
-{{- /* Stub pages for posts hosted elsewhere: give the reader somewhere to go.
-       Canonical for these points at the external host (see partials/seo.html),
-       so the stub is a signpost, not a competing copy of the article. */ -}}
-{{- with .Params.external_url }}
-<p class="external-cta">
-    &rarr; <a href="{{ . }}" target="_blank" rel="noopener">Read the full article on {{ (urls.Parse .).Host | replaceRE "^www\\." "" }}</a>
-</p>
-{{- end }}
+    {{- /* Visible date and byline: Google surfaces both for technical content,
+           and a reader landing cold needs to know how current this is. */ -}}
+    {{- if and .IsPage (not .Date.IsZero) }}
+    <p class="post-meta">
+        <time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "Jan. 2, 2006" }}</time>
+        {{- with .Site.Params.author }} &middot; <a href="{{ "about/" | absURL }}" rel="author">{{ . }}</a>{{ end }}
+        {{- if and .WordCount (ge .WordCount 400) }} &middot; {{ .ReadingTime }} min read{{ end }}
+    </p>
+    {{- end }}
+
+    {{ .Content }}
+
+    {{- /* Stub pages for posts hosted elsewhere: give the reader somewhere to go.
+           Canonical for these points at the external host (see partials/seo.html),
+           so the stub is a signpost, not a competing copy of the article. */ -}}
+    {{- with .Params.external_url }}
+    <p class="external-cta">
+        &rarr; <a href="{{ . }}" target="_blank" rel="noopener">Read the full article on {{ (urls.Parse .).Host | replaceRE "^www\\." "" }}</a>
+    </p>
+    {{- end }}
+
+    {{- with .Params.tags }}
+    <p class="post-tags">
+        {{- range . }}<a href="{{ (printf "tags/%s/" (. | urlize)) | absURL }}">#{{ . }}</a> {{ end -}}
+    </p>
+    {{- end }}
+</article>
 {{ end }}
