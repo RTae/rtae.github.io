@@ -53,43 +53,6 @@
 }
 
 /* ---------------------------------------------------------------------------
-   Animation
-
-   Replaces animate.css (71 KB) with the one effect the site configures via
-   params.animateStyle = "animated zoomIn fast".
---------------------------------------------------------------------------- */
-@keyframes zoomIn {
-    from {
-        opacity: 0;
-        transform: scale3d(0.3, 0.3, 0.3);
-    }
-    50% {
-        opacity: 1;
-    }
-}
-
-.animated {
-    animation-duration: 1s;
-    animation-fill-mode: both;
-}
-
-.animated.fast {
-    animation-duration: 800ms;
-}
-
-.animated.zoomIn {
-    animation-name: zoomIn;
-}
-
-/* Honour a reduced-motion preference. animate.css did this too. */
-@media (prefers-reduced-motion: reduce) {
-    .animated {
-        animation: none !important;
-        transition: none !important;
-    }
-}
-
-/* ---------------------------------------------------------------------------
    Links out, article metadata
 --------------------------------------------------------------------------- */
 

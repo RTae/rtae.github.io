@@ -23,9 +23,10 @@ enableGitInfo = true
   # Cutting off the page title to two chars for mobile (console-demo -> co)
   titleCutting = true
 
-  # Set the animation style -- https://animate.style/
-  # To disable animations, please remove or comment animationStyle parameter
-  animateStyle = "animated zoomIn fast" 
+  # Page-load animation intentionally disabled. Leave this unset.
+  # (The theme's animate.css v4 uses animate__-prefixed classes, so the old
+  # "animated zoomIn fast" value never matched anything and was a no-op.)
+  # animateStyle = "animated zoomIn fast"
   
   [[params.navlinks]]
   name = "about/"
