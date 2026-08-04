@@ -41,11 +41,13 @@
     {{ range (sort .Pages "Date" "desc") }}
       <li>
         <div class="paper">
+          {{- $paperUrl := or .Params.external_url .Permalink -}}
           {{ if eq .Params.status "Being review" }}
             <span class="paper-title">{{ .Title }}</span>
             <p><em>{{ .Params.journal }}</em> ({{ .Params.status }})</p>
           {{ else }}
-            <a href="{{ .Params.external_url }}" class="paper-title" target="_blank">{{ .Title }}</a>
+            <a href="{{ $paperUrl }}" class="paper-title"
+               {{- with .Params.external_url }} target="_blank" rel="noopener"{{ end }}>{{ .Title }}</a>
             <p><em>{{ .Params.journal }}</em> ({{ .PublishDate.Format "01-2006" }})</p>
           {{ end }}
           <p class="authors">
@@ -101,13 +103,18 @@
 <div class="posts-list">
 {{ with .Site.GetPage "/articles" }}
     {{ range first 4 (sort .Data.Pages "Date" "desc" (where .Pages ".Params.private" "!=" true))}}
+        {{- /* Self-hosted posts have no external_url; fall back to the permalink
+               so the link never renders empty (an empty href reloads this page). */ -}}
+        {{- $ext := .Params.external_url -}}
         <div class="post">
             <p>
                 <div class="date">{{ .PublishDate.Format "01-2006" }}</div>
-                <h1><a href="{{ .Params.external_url }}" title="{{ .Title }}">{{ .Title }}</a></h1>
+                <h1><a href="{{ or $ext .Permalink }}" title="{{ .Title }}"
+                       {{- with $ext }} target="_blank" rel="noopener"{{ end }}>{{ .Title }}</a>
+                    {{- with $ext }} <span class="external-marker" aria-hidden="true">&#8599;</span>{{ end }}</h1>
                 {{ .Summary }}
             </p>
-        </div>    
+        </div>
     {{ end }}
 {{ end }}
 </div>
