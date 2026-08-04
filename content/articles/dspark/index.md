@@ -29,6 +29,8 @@ The whole thing lives or dies on **accepted length**: how many of those γ propo
 
 So you pick your poison: good acceptance with serial draft cost, or cheap parallel drafting with a decaying tail. DSpark's claim is that this is a false choice.
 
+{{< figure src="drafters.svg" alt="Three draft-block designs side by side. An autoregressive drafter chains four tokens with one forward pass each. A parallel drafter emits all four from a single backbone pass with no links between positions, and the tokens fade toward the tail to show acceptance decay. DSpark keeps the single backbone pass and adds a light transition bias between adjacent positions, so no fading occurs." caption="The trade-off DSpark refuses. Dependencies cost you passes (left) or acceptance (middle); the transition bias buys them back for about 1% latency (right)." >}}
+
 ## Semi-autoregressive drafting
 
 The architectural move is small and, in hindsight, obvious — which is usually the sign of a good one.

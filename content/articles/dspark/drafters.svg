@@ -1,0 +1,140 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 300" width="1080" height="300" role="img" aria-labelledby="title desc">
+  <title id="title">Three draft-block designs compared</title>
+  <desc id="desc">Autoregressive drafters generate one token per forward pass, preserving dependencies but re-introducing serial cost. Parallel drafters emit the whole block in a single pass with no dependencies between positions, so acceptance decays toward the tail. DSpark keeps the parallel backbone and adds a lightweight transition bias between adjacent positions, recovering the dependency without the serial cost.</desc>
+
+  <style>
+    svg { font-family: "Roboto Mono Subset", "Roboto Mono", ui-monospace, monospace; }
+    .fg   { fill: #151515; }
+    .mut  { fill: #727578; }
+    .pri  { fill: #1a95e0; }
+    .box  { fill: none; stroke: #727578; stroke-width: 1.5; }
+    .boxp { fill: none; stroke: #1a95e0; stroke-width: 1.5; }
+    .ln   { stroke: #727578; stroke-width: 1.5; fill: none; }
+    .lnp  { stroke: #1a95e0; stroke-width: 1.5; fill: none; }
+    .ah   { fill: #727578; }
+    .ahp  { fill: #1a95e0; }
+    .frame { fill: none; stroke: #727578; stroke-width: 1; stroke-opacity: .3; }
+    .t-title { font-size: 14px; font-weight: 700; }
+    .t-sub   { font-size: 11px; }
+    .t-tok   { font-size: 12px; }
+    .t-note  { font-size: 11px; }
+    .t-mini  { font-size: 10px; }
+
+    /* The page background flips with the OS theme; so does this. */
+    @media (prefers-color-scheme: dark) {
+      .fg   { fill: #e8e9ed; }
+      .mut  { fill: #a3abba; }
+      .pri  { fill: #62c4ff; }
+      .box  { stroke: #a3abba; }
+      .boxp { stroke: #62c4ff; }
+      .ln   { stroke: #a3abba; }
+      .lnp  { stroke: #62c4ff; }
+      .ah   { fill: #a3abba; }
+      .ahp  { fill: #62c4ff; }
+      .frame { stroke: #a3abba; }
+    }
+  </style>
+
+  <defs>
+    <marker id="a" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L8 4 L0 8 z" class="ah"/>
+    </marker>
+    <marker id="ap" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L8 4 L0 8 z" class="ahp"/>
+    </marker>
+  </defs>
+
+  <!-- ================= Panel 1: autoregressive ================= -->
+  <g transform="translate(0,4)">
+    <rect class="frame" x="0" y="0" width="340" height="292" rx="3"/>
+    <text class="fg t-title" x="18" y="26">Autoregressive drafter</text>
+    <text class="mut t-sub"  x="18" y="44">EAGLE-style — one forward pass per token</text>
+
+    <!-- per-token pass counters -->
+    <text class="mut t-mini" x="50"  y="140" text-anchor="middle">pass 1</text>
+    <text class="mut t-mini" x="130" y="140" text-anchor="middle">pass 2</text>
+    <text class="mut t-mini" x="210" y="140" text-anchor="middle">pass 3</text>
+    <text class="mut t-mini" x="290" y="140" text-anchor="middle">pass 4</text>
+
+    <rect class="box" x="22"  y="150" width="56" height="38" rx="2"/>
+    <rect class="box" x="102" y="150" width="56" height="38" rx="2"/>
+    <rect class="box" x="182" y="150" width="56" height="38" rx="2"/>
+    <rect class="box" x="262" y="150" width="56" height="38" rx="2"/>
+    <text class="fg t-tok" x="50"  y="174" text-anchor="middle">x1</text>
+    <text class="fg t-tok" x="130" y="174" text-anchor="middle">x2</text>
+    <text class="fg t-tok" x="210" y="174" text-anchor="middle">x3</text>
+    <text class="fg t-tok" x="290" y="174" text-anchor="middle">x4</text>
+
+    <!-- each token conditions on the one actually sampled before it -->
+    <path class="ln" d="M78 169 H98"  marker-end="url(#a)"/>
+    <path class="ln" d="M158 169 H178" marker-end="url(#a)"/>
+    <path class="ln" d="M238 169 H258" marker-end="url(#a)"/>
+
+    <text class="fg t-note"  x="18" y="240">Dependencies intact.</text>
+    <text class="mut t-note" x="18" y="258">But that is four passes to save one:</text>
+    <text class="mut t-note" x="18" y="274">the serial cost comes straight back.</text>
+  </g>
+
+  <!-- ================= Panel 2: parallel ================= -->
+  <g transform="translate(370,4)">
+    <rect class="frame" x="0" y="0" width="340" height="292" rx="3"/>
+    <text class="fg t-title" x="18" y="26">Parallel drafter</text>
+    <text class="mut t-sub"  x="18" y="44">DFlash-style — whole block in one pass</text>
+
+    <rect class="box" x="22" y="70" width="296" height="26" rx="2"/>
+    <text class="mut t-mini" x="170" y="87" text-anchor="middle">draft backbone — single forward pass</text>
+
+    <path class="ln" d="M50 96  V146" marker-end="url(#a)"/>
+    <path class="ln" d="M130 96 V146" marker-end="url(#a)"/>
+    <path class="ln" d="M210 96 V146" marker-end="url(#a)"/>
+    <path class="ln" d="M290 96 V146" marker-end="url(#a)"/>
+
+    <!-- positions predicted independently: opacity falls off toward the tail -->
+    <g opacity="1.00"><rect class="box" x="22"  y="150" width="56" height="38" rx="2"/><text class="fg t-tok" x="50"  y="174" text-anchor="middle">x1</text></g>
+    <g opacity="0.72"><rect class="box" x="102" y="150" width="56" height="38" rx="2"/><text class="fg t-tok" x="130" y="174" text-anchor="middle">x2</text></g>
+    <g opacity="0.50"><rect class="box" x="182" y="150" width="56" height="38" rx="2"/><text class="fg t-tok" x="210" y="174" text-anchor="middle">x3</text></g>
+    <g opacity="0.32"><rect class="box" x="262" y="150" width="56" height="38" rx="2"/><text class="fg t-tok" x="290" y="174" text-anchor="middle">x4</text></g>
+
+    <text class="mut t-mini" x="170" y="212" text-anchor="middle">no link between positions</text>
+
+    <text class="fg t-note"  x="18" y="240">Draft latency is O(1) in block size.</text>
+    <text class="mut t-note" x="18" y="258">Each position marginalises over every</text>
+    <text class="mut t-note" x="18" y="274">predecessor: acceptance decays.</text>
+  </g>
+
+  <!-- ================= Panel 3: DSpark ================= -->
+  <g transform="translate(740,4)">
+    <rect class="frame" x="0" y="0" width="340" height="292" rx="3"/>
+    <text class="pri t-title" x="18" y="26">DSpark</text>
+    <text class="mut t-sub"   x="18" y="44">parallel backbone + sequential head</text>
+
+    <rect class="box" x="22" y="70" width="296" height="26" rx="2"/>
+    <text class="mut t-mini" x="170" y="87" text-anchor="middle">draft backbone — single forward pass</text>
+
+    <path class="ln" d="M50 96  V146" marker-end="url(#a)"/>
+    <path class="ln" d="M130 96 V146" marker-end="url(#a)"/>
+    <path class="ln" d="M210 96 V146" marker-end="url(#a)"/>
+    <path class="ln" d="M290 96 V146" marker-end="url(#a)"/>
+
+    <!-- full strength: the tail no longer decays -->
+    <rect class="box" x="22"  y="150" width="56" height="38" rx="2"/>
+    <rect class="box" x="102" y="150" width="56" height="38" rx="2"/>
+    <rect class="box" x="182" y="150" width="56" height="38" rx="2"/>
+    <rect class="box" x="262" y="150" width="56" height="38" rx="2"/>
+    <text class="fg t-tok" x="50"  y="174" text-anchor="middle">x1</text>
+    <text class="fg t-tok" x="130" y="174" text-anchor="middle">x2</text>
+    <text class="fg t-tok" x="210" y="174" text-anchor="middle">x3</text>
+    <text class="fg t-tok" x="290" y="174" text-anchor="middle">x4</text>
+
+    <!-- Markov head: low-rank transition bias from the sampled predecessor -->
+    <path class="lnp" d="M50 188 Q90 218 126 192"  marker-end="url(#ap)"/>
+    <path class="lnp" d="M130 188 Q170 218 206 192" marker-end="url(#ap)"/>
+    <path class="lnp" d="M210 188 Q250 218 286 192" marker-end="url(#ap)"/>
+    <text class="pri t-mini" x="90"  y="234" text-anchor="middle">B</text>
+    <text class="pri t-mini" x="170" y="234" text-anchor="middle">B</text>
+    <text class="pri t-mini" x="250" y="234" text-anchor="middle">B</text>
+
+    <text class="fg t-note"  x="18" y="258">Still one pass. The bias adds 0.2–1.3%</text>
+    <text class="mut t-note" x="18" y="274">latency and restores the dependency.</text>
+  </g>
+</svg>
