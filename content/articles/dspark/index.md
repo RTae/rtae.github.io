@@ -86,11 +86,6 @@ Three things I am taking from this paper.
 
 **Calibration is infrastructure.** A confidence signal that is only a good ranker is fine for a threshold and actively harmful for a scheduler that multiplies probabilities into a survival estimate. The temperature-scaling step is three lines of conceptual weight and moves ECE from 8% to 1%. Worth remembering the next time a model's confidence output is used as an actual probability rather than a sort key.
 
-## Related reading
-
-- [How does vLLM optimize the LLM serving system?](/articles/vllm/) — continuous batching and paged attention, the layer underneath everything discussed here.
-- [Enhanced LLM Applications with Monitoring and Observability](/articles/langfuse/) — on measuring what your serving stack actually does in production.
-
 ---
 
 *Paper: [arXiv:2607.05147](https://arxiv.org/abs/2607.05147). All figures cited above are the authors'.*
