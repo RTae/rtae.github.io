@@ -14,7 +14,7 @@ Most speculative decoding papers optimize a number that does not survive contact
 ## Why decoding is the bottleneck
 LLM inference has two phases which are **prefill** and **decode**. In prefill, the model processes the whole prompt in one forward pass, building the KV cache and producing the first output token. Every prompt token is processed in parallel, so each weights loaded from memory is reused across many tokens. Prefill is therefore compute-bound and fast per token.
 
-Decode produces the rest of the output, one token per forward pass, because each token depends on the one before it. Every step has to stream the full model weights (and the KV cache) from GPU memory to produce just one token per request. There is very little math to do for each byte loaded, so the GPU spends most of its time waiting on memory bandwidth, which is far slower than its compute. Decode is memory-bound, and since it runs once per output token, it dominates end-to-end latency.
+Decode produces the rest of the output, one token per forward pass, because each token depends on the one before it. Every step has to stream the full model weights (and the KV cache) from GPU memory to produce just one token per request. There is very little computation to do for each loaded, so the GPU spends most of its time waiting on memory bandwidth, which is far slower than its compute. Decode is memory-bound, and since it runs once per output token, it dominates end-to-end latency.
 
 There are many ways to attack this: prefill/decode disaggregation, quantization, distillation, hardware with more memory bandwidth (such as NVIDIA Rubin), and speculative decoding. This article focuses on speculative decoding.
 
