@@ -12,13 +12,15 @@ Most speculative decoding papers optimize a number that does not survive contact
 ## TLDR
 
 ## Why decoding is the bottleneck
+
 LLM inference has two phases which are **prefill** and **decode**. In prefill, the model processes the whole prompt in one forward pass, building the KV cache and producing the first output token. Every prompt token is processed in parallel, so each weights loaded from memory is reused across many tokens. Prefill is therefore compute-bound and fast per token.
 
 Decode produces the rest of the output, one token per forward pass, because each token depends on the one before it. Every step has to stream the full model weights (and the KV cache) from GPU memory to produce just one token per request. There is very little computation to do for each loaded, so the GPU spends most of its time waiting on memory bandwidth, which is far slower than its compute. Decode is memory-bound, and since it runs once per output token, it dominates end-to-end latency.
 
-There are many ways to attack this: prefill/decode disaggregation, quantization, distillation, hardware with more memory bandwidth (such as NVIDIA Rubin), and speculative decoding. This article focuses on speculative decoding.
+There are many ways to attack this such as prefill/decode disaggregation, quantization, hardware with more memory bandwidth (such as NVIDIA Rubin), and speculative decoding. This article focuses on speculative decoding.
 
 ## What is speculative decoding?
+
 Speculative decoding takes advantage of the gap described above. Because decode is memory-bound, a forward pass over k tokens costs roughly the same as a pass over one token. So instead of asking the large *target* model for one token at a time, we let a cheap *drafter* guess the next k tokens, then have the target check all k of them in a single forward pass, which works like a small prefill. We keep the longest prefix the target agrees with, plus one token from the target itself, so every step produces at least one token. With rejection sampling, the output distribution is exactly the same as the target model's. The method is lossless, unlike quantization or distillation.
 
 The speedup depends on two things: how cheap the draft is, and how many draft tokens get accepted. The two main families of drafters trade these off differently.
