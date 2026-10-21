@@ -12,9 +12,11 @@ Most speculative decoding papers optimize a number that does not survive contact
 ## TLDR
 
 ## Why decoding is the bottleneck
-In LLM arhitechture are two main process that model to do first is prefill process and second is decode process. Prefill process is the process that model generate the first token of the output sequence, and decode process is the process that model generate the rest of the output sequence. In prefill process, model can generate the first token in parallel for all request in a batch which in practice is very fast and compute bound. However, in decode process, model can only generate the next token after the previous token is generated which in practice is very slow and memory bound due to the speed of the bandwith memory is very difference from the speed of the compute. Therefore, decode process is the bottleneck of the LLM inference.
+LLM inference has two phases: **prefill** and **decode**. In prefill, the model processes the whole prompt in one forward pass, building the KV cache and producing the first output token. Every prompt token is processed in parallel, so each weight loaded from memory is reused across many tokens. Prefill is therefore compute-bound and fast per token.
 
-There are many method try resolve this issue such as disaggregated inference, model quantization, model distillation, speculative decoding and hardware specific to improve bandwidth memory (Like nvidia Rubin). In this article, we will focus on the speculative decoding method.
+Decode produces the rest of the output, one token per forward pass, because each token depends on the one before it. Every step has to stream the full model weights (and the KV cache) from GPU memory to produce just one token per request. There is very little math to do for each byte loaded, so the GPU spends most of its time waiting on memory bandwidth, which is far slower than its compute. Decode is memory-bound, and since it runs once per output token, it dominates end-to-end latency.
+
+There are many ways to attack this: prefill/decode disaggregation, quantization, distillation, hardware with more memory bandwidth (such as NVIDIA Rubin), and speculative decoding. This article focuses on speculative decoding.
 
 ## What is speculative decoding?
 Speculative decoding takes advantage of the gap described above. Because decode is memory-bound, a forward pass over k tokens costs roughly the same as a pass over one token. So instead of asking the large *target* model for one token at a time, we let a cheap *drafter* guess the next k tokens, then have the target check all k of them in a single forward pass, which works like a small prefill. We keep the longest prefix the target agrees with, plus one token from the target itself, so every step produces at least one token. With rejection sampling, the output distribution is exactly the same as the target model's. The method is lossless, unlike quantization or distillation.
@@ -26,7 +28,9 @@ The speedup depends on two things: how cheap the draft is, and how many draft to
 2. **Parallel drafter** (e.g. Medusa heads, block or diffusion drafters): the drafter predicts all k tokens in a single forward pass. Drafting cost stays roughly constant as k grows, but each position is predicted without seeing the actual tokens before it, so the acceptance rate drops at later positions in the block.
 
 ## What's wrong with the prior methods?
-1. Previous methods for parallel drafter model inter-token dependencies with in a block leads to multi-modal and the accepted token rate is decay  at later positon
+1. **Parallel drafters ignore dependencies inside the block.** Each position in the block is predicted independently, without knowing which token the earlier positions chose. When several continuations are plausible (the distribution is multi-modal), different positions can lock onto different ones. For example, after "I'm flying to", position 1 may guess "New" while position 2 guesses "Angeles", because both "New York" and "Los Angeles" are likely. Each token looks reasonable on its own, but together they are nonsense. Since verification only accepts a prefix, one wrong token throws away everything after it, so errors compound and acceptance decays at later positions. This is *suffix decay*: making the block longer adds draft tokens that almost never get accepted.
+
+2. **Draft length is a fixed hyperparameter.** Both families draft and verify the same k tokens for every request at every step. At batch size one that is nearly free, because verification uses compute that would otherwise sit idle. Under real concurrency, decode becomes less memory-bound as the batch grows, so every draft token the target verifies and then rejects is wasted compute that could have served another request. A k tuned on single-request benchmarks drafts too few tokens for easy requests that would accept more, and wastes verification on hard ones.
 
 ## How DSpark works
 
