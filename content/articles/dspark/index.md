@@ -13,9 +13,9 @@ Most speculative decoding papers optimize a number that does not survive contact
 
 ## Why decoding is the bottleneck
 
-LLM inference has two phases, **prefill** and **decode**. In prefill, the model processes the whole prompt in one forward pass, building the KV cache and producing the first output token. Every prompt token is processed in parallel, so each weight loaded from memory is reused across many tokens. Prefill is therefore compute-bound and fast per token.
+LLM inference has two phases, **prefill** and **decode**. In prefill, the model processes the whole prompt in one forward pass, building the KV cache and producing the first output token. Every prompt token is processed in parallel, so each weight read from memory is reused across many tokens. Prefill is therefore compute-bound and fast per token.
 
-Decode produces the rest of the output, one token per forward pass, because each token depends on the one before it. Every step has to stream the full model weights (and the KV cache) from GPU memory to produce just one token per request. There is very little computation to do for each byte loaded, so the GPU spends most of its time waiting on memory bandwidth, which is far slower than its compute. Decode is memory-bound, and since it runs once per output token, it dominates end-to-end latency.
+Decode produces the rest of the output, one token per forward pass, because each token depends on the one before it. Every step has to read all the model weights and the KV cache from GPU memory to produce just one token per request, and since the KV cache grows with every token, these reads get longer as the output grows. There is very little computation to do for each byte read, so the GPU spends most of its time waiting on memory bandwidth, which is far slower than its compute. Decode is memory-bound, and since it runs once per output token, it dominates end-to-end latency.
 
 There are many ways to tackle this problem, including prefill/decode disaggregation, quantization, hardware with more memory bandwidth (such as NVIDIA Rubin), and speculative decoding. This article focuses on speculative decoding.
 
@@ -25,9 +25,9 @@ Speculative decoding takes advantage of the gap described above. Because decode 
 
 The speedup depends on two things: first, how cheap the draft is, and second, how many draft tokens get accepted. The two main families of drafters trade these off differently.
 
-1. **Autoregressive drafter** (e.g. a small LM, EAGLE): the drafter generates the k tokens one at a time, each conditioned on the previous one. Drafts are high quality because every token sees the tokens before it, but drafting cost grows linearly with k, so draft lengths stay short.
+1. **Autoregressive drafter**: the drafter generates the k tokens one at a time, each conditioned on the previous one. Drafts are high quality because every token sees the tokens before it, but drafting cost grows linearly with k, so draft lengths stay short. Popular methods include EAGLE-3 and MTP, often paired with tree-based verification to make up for the short drafts.
 
-2. **Parallel drafter** (e.g. Medusa heads, block or diffusion drafters): the drafter predicts all k tokens in a single forward pass. Drafting cost stays roughly constant as k grows, but each position is predicted without seeing the actual tokens before it, so the acceptance rate drops at later positions in the block.
+2. **Parallel drafter**: the drafter predicts all k tokens in a single forward pass. Drafting cost stays roughly constant as k grows, but each position is predicted without seeing the actual tokens before it, so the acceptance rate drops at later positions in the block. Popular methods include Medusa, PARD, DART, and DFlash.
 
 ## What's wrong with the prior methods?
 
