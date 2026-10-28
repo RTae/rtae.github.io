@@ -49,13 +49,13 @@ The paper measures *conditional acceptance* at each position such as how often a
 
 Put together, the two families fail in opposite places. Autoregressive drafters are weak at the first position, and parallel drafters get weaker at later ones.
 
+{{< figure src="prior-verify.png" link="prior-verify.png" alt="Left: with a fixed length of six draft tokens, a code request keeps five and a chat request keeps one. Right: at light load a target step has idle slots, so rejected tokens are cheap; at heavy load every slot is full, rejected tokens take room, and a fifth request waits." caption="Illustrative, not measured. Based on the paper's two axes: code sustains higher acceptance than chat, and under heavy load, tokens likely to be rejected take batch capacity that could serve other requests." >}}
+
 - **Verification length**: Parallel drafting makes long blocks cheap to produce, but verifying every drafted token is not cheap. The ideal verification length changes along two axes.
   - **Data:** acceptance depends on the request. Structured text such as code sustains much higher acceptance than open-ended chat, so any single length is too short for some requests and too long for others.
   - **System load:** at light load, verifying an extra token is nearly free. The GPU is waiting on memory anyway, so even a rejected token costs almost nothing. Under heavy load, every token sent for verification adds to the batch the target model processes in that step, and the step gets slower as that batch grows. A token that is likely to be rejected takes batch capacity that could have served another request.
 
 Prior methods either verify a fixed number of tokens or use a static confidence threshold to decide how many to verify. Neither looks at the current load. That works under single-request assumptions but is suboptimal in a high-concurrency production system. Before DSpark, DeepSeek's production serving used MTP-1, a single draft token, because deploying a static multi-token drafter (MTP-3 or MTP-5) degraded aggregate throughput under high concurrency.
-
-{{< figure src="prior-verify.png" link="prior-verify.png" alt="Left: with a fixed length of six draft tokens, a code request keeps five and a chat request keeps one. Right: at light load a target step has idle slots, so rejected tokens are cheap; at heavy load every slot is full, rejected tokens take room, and a fifth request waits." caption="Illustrative, not measured. Based on the paper's two axes: code sustains higher acceptance than chat, and under heavy load, tokens likely to be rejected take batch capacity that could serve other requests." >}}
 
 ## How DSpark works
 
