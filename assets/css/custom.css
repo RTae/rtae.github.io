@@ -170,6 +170,38 @@
     display: var(--display-h1-decoration);
 }
 
+/* Click-to-zoom overlay for article figures (assets/js/zoom.js). */
+article figure > a {
+    cursor: zoom-in;
+}
+
+/* The theme paints a primary-colour background behind hovered links; behind an
+   image that shows up as a coloured edge, so figures opt out. */
+article figure > a:hover {
+    background: none;
+}
+
+dialog.zoom {
+    max-width: 96vw;
+    max-height: 96vh;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: zoom-out;
+}
+
+dialog.zoom::backdrop {
+    background: rgba(0, 0, 0, 0.85);
+}
+
+/* The theme sets img { width: 100% }; the enlarged image sizes to itself. */
+dialog.zoom img {
+    display: block;
+    width: auto;
+    max-width: 96vw;
+    max-height: 96vh;
+}
+
 /* ---------------------------------------------------------------------------
    Inline icons (replacing jsDelivr / Wikimedia hotlinks)
 --------------------------------------------------------------------------- */

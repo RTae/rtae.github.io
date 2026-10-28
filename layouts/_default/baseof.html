@@ -19,6 +19,11 @@
       {{ $css := . | minify | fingerprint }}
       <link rel="stylesheet" href="{{ $css.RelPermalink }}" integrity="{{ $css.Data.Integrity }}">
     {{ end }}
+    {{- /* Click-to-zoom for article figures; deferred so it never blocks render. */ -}}
+    {{ with resources.Get "js/zoom.js" }}
+      {{ $js := . | minify | fingerprint }}
+      <script src="{{ $js.RelPermalink }}" integrity="{{ $js.Data.Integrity }}" defer></script>
+    {{ end }}
 
     {{- partial "favicon.html" . -}}
     {{ with .OutputFormats.Get "RSS" }}
