@@ -9,35 +9,35 @@ Most speculative decoding papers optimize a number that does not survive contact
 
 <!--more-->
 
-## TLDR
+# TLDR
 
-## Why decoding is the bottleneck
+# 1. Why decoding is the bottleneck
+
+{{< figure src="decode-bottleneck.png" link="decode-bottleneck.png" alt="Llama 3 8B on one H100, drawn to scale. Prefill reads the 15 GB of weights once in about 4.5 ms while computing on all 2,000 prompt tokens takes about 31 ms, so compute is the bottleneck. Each decode step reads 15.3 GB of weights and KV cache in about 4.6 ms but computes for only 0.016 ms, so compute sits idle 99.6% of the time." caption="Llama 3 8B (BF16) on one H100 at batch 1, from peak specs; drawn to scale." >}}
 
 LLM inference has two phases, **prefill** and **decode**. In prefill, the model processes the whole prompt in one forward pass, building the KV cache and producing the first output token. Every prompt token is processed in parallel, so each weight read from memory is reused across many tokens. Prefill is therefore compute-bound and fast per token.
 
 Decode produces the rest of the output, one token per forward pass, because each token depends on the one before it. Every step has to read all the model weights and the KV cache from GPU memory to produce just one token per request, and since the KV cache grows with every token, these reads get longer as the output grows. There is very little computation to do for each byte read, so the GPU spends most of its time waiting on memory bandwidth, which is far slower than its compute. Decode is memory-bound, and since it runs once per output token, it dominates end-to-end latency.
 
-{{< figure src="decode-bottleneck.png" link="decode-bottleneck.png" alt="Two timelines. Prefill: one read of the weights, then a long compute bar over every prompt token, producing token 1. Decode: four steps, each a full read of the weights and KV cache with idle compute and a short compute sliver, producing one token per step." caption="Prefill reuses each weight read across the prompt; decode re-reads all weights and the KV cache for every token. Not to scale." >}}
-
 There are many ways to tackle this problem, including prefill/decode disaggregation, quantization, hardware with more memory bandwidth (such as NVIDIA Rubin), and speculative decoding. This article focuses on speculative decoding.
 
-## What is speculative decoding?
+# 2. What is speculative decoding?
 
-Speculative decoding takes advantage of the gap described above. Because decode is memory-bound, a forward pass over k tokens costs roughly the same as a pass over one token. So instead of asking the large *target* model for one token at a time, we let a cheap *drafter* guess the next k tokens, then have the target check all k of them in a single forward pass, which works like a small prefill. We keep the longest prefix the target agrees with, plus one token from the target itself, so every step produces at least one token. With rejection sampling, the output distribution is exactly the same as the target model's. The method is lossless, unlike quantization.
+Speculative decoding takes advantage of the gap described above. This is because decode is memory-bound, a forward pass over k tokens costs roughly the same as a pass over one token. So instead of asking the large *target* model for one token at a time, we let a cheap *drafter* guess the next k tokens, then have the target check all k of them in a single forward pass, which works like a small prefill. We keep the longest prefix the target agrees with, plus one token from the target itself, so every step produces at least one token. With rejection sampling, the output distribution is exactly the same as the target model's. The method is lossless, unlike quantization.
 
 The speedup depends on two things. First, how cheap the draft is. Second, how many draft tokens get accepted. The two main families of drafters trade these off differently.
 
-- **Autoregressive drafter**: the drafter generates the k tokens one at a time, each conditioned on the previous one. Drafts are high quality because every token sees the tokens before it, but drafting cost grows linearly with k, so draft lengths stay short. Popular methods include EAGLE-3 and MTP, often paired with tree-based verification to make up for the short drafts.
-
 {{< figure src="drafter-ar.png" link="drafter-ar.png" alt="An autoregressive drafter runs four passes in sequence, each producing one draft token (fox, jumps, over, a) that feeds the next pass. The target verifies all four in one pass, keeps fox, jumps and over, and replaces the rejected a with its own token, the." caption="Autoregressive drafter: one pass per draft token. Illustrative." >}}
 
-- **Parallel drafter**: the drafter predicts all k tokens in a single forward pass. Drafting cost stays roughly constant as k grows, but each position is predicted without seeing the actual tokens before it, so the acceptance rate drops at later positions in the block. Popular methods include Medusa, PARD, DART, and DFlash.
+- **Autoregressive drafter**: the drafter generates the k tokens one at a time, each conditioned on the previous one. Drafts are high quality because every token sees the tokens before it, but drafting cost grows linearly with k, so draft lengths stay short. Popular methods include EAGLE-3 and MTP, often paired with tree-based verification to make up for the short drafts.
 
 {{< figure src="drafter-parallel.png" link="drafter-parallel.png" alt="A parallel drafter produces all four draft tokens in a single pass, with no links between positions. The target verifies them in one pass with the same outcome: fox, jumps and over are kept and the target's token replaces a." caption="Parallel drafter: one pass for the whole block. Illustrative." >}}
 
-## What's wrong with the prior methods?
+- **Parallel drafter**: the drafter predicts all k tokens in a single forward pass. Drafting cost stays roughly constant as k grows, but each position is predicted without seeing the actual tokens before it, so the acceptance rate drops at later positions in the block. Popular methods include Medusa, PARD, DART, and DFlash.
 
-{{< figure src="prior-ar.png" link="prior-ar.png" alt="Left: a symbolic chart where autoregressive drafting time rises linearly with block length while parallel drafting time stays flat. Right: a bar chart of acceptance at position 1, EAGLE-3 versus DFlash: 0.81 vs 0.88 on math and 0.53 vs 0.72 on chat." caption="Left: symbolic. Right: acceptance at position 1 (DSpark paper, Sec. 4.3.1)." >}}
+# 3. What's wrong with the prior methods?
+
+{{< figure src="prior-ar.png" link="prior-ar.png" alt="Left: drafter forward passes per block, k for an autoregressive drafter and 1 for a parallel drafter. Right: a bar chart of acceptance at position 1, EAGLE-3 versus DFlash: 0.81 vs 0.88 on math and 0.53 vs 0.72 on chat." caption="Left: drafter passes per block. Right: acceptance at position 1 (DSpark paper, Sec. 4.3.1)." >}}
 
 - **Autoregressive drafters**: Each draft token needs its own drafter forward pass, so drafting latency grows linearly with the block length. To keep that latency low, these drafters use short blocks and small, shallow networks. Tree-based verification tries to make up for the short blocks by verifying several candidate paths at once, but that sends many more tokens to the target model and reduces overall serving throughput. Therefore, this create a degrade impact on the first draft position, because the target only accepts a prefix, a miss there throws away the whole block. At position 1, EAGLE-3, an autoregressive drafter, is accepted less often than DFlash, a parallel drafter that can afford a much deeper network by 0.81 vs. 0.88 on math, and 0.53 vs. 0.72 on chat.
 
@@ -57,19 +57,19 @@ Put together, the two families fail in opposite places. Autoregressive drafters 
 
 Prior methods either verify a fixed number of tokens or use a static confidence threshold to decide how many to verify. Neither looks at the current load. That works under single-request assumptions but is suboptimal in a high-concurrency production system. Before DSpark, DeepSeek's production serving used MTP-1, a single draft token, because deploying a static multi-token drafter (MTP-3 or MTP-5) degraded aggregate throughput under high concurrency.
 
-## How DSpark works
+# 4. How DSpark works
 
-### Semi-autoregressive generation
+## 4.1Semi-autoregressive generation
 
-### Confidence-scheduled verification
-#### Confidence Head
-#### Hardware-Aware Prefix Scheduler
+## 4.2 Confidence-scheduled verification
+### 4.2.1 Confidence Head
+### 4.2.2 Hardware-Aware Prefix Scheduler
 
-## Results
+# 5. Results
 
-### Experimental Setup
-### Experimental Results
-### Experimental Analysis
+## 5.1 Experimental Setup
+## 5.2 Experimental Results
+## 5.3 Experimental Analysis
 1. Why can Parallel drafter outperform Autoregressive drafter?
 2. A little Autoregressive drafter goes a long way
 3. Verify Smater, not Longer: The role of Confidence Scheduling
@@ -78,13 +78,15 @@ Prior methods either verify a fixed number of tokens or use a static confidence 
    2. Hareware-Aware Prefix Scheduler:
    3. High Throughput with Low Latency:
    4. Reult from real traffic:
-### Limitations and Future Work
+## 5.4 Limitations and Future Work
 
-## Demo with vLLM
+# 6. Demo
 
-## Demo with Deepinfer
+## 6.1 Demo with vLLM
 
-## Takeaways
+## 6.2 Demo with Deepinfer
+
+# 7 Takeaways
 
 ---
 
