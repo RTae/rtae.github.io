@@ -14,7 +14,7 @@ TBD
 
 # 1. Why decoding is the bottleneck
 
-{{< figure src="decode-bottleneck.png" link="decode-bottleneck.png" alt="Llama 3 8B on one H100, drawn to scale. Prefill reads the 15 GB of weights once in about 4.5 ms while computing on all 2,000 prompt tokens takes about 31 ms, so compute is the bottleneck. Each decode step reads 15.3 GB of weights and KV cache in about 4.6 ms but computes for only 0.016 ms, so compute sits idle 99.6% of the time." caption="Llama 3 8B (BF16) on one H100 at batch 1, from peak specs; drawn to scale." >}}
+{{< figure src="decode-bottleneck.png" link="decode-bottleneck.png" alt="Two panels. Prefill: the model weights are read from GPU memory once, all prompt tokens are computed together, and K,V for every prompt token is written to the KV cache, so compute stays busy. Decode: each step reads all the weights and the whole KV cache again, computes only the newest token, and writes its K,V back, so compute waits for the data most of each step." caption="Illustrative, not to scale: what moves between GPU memory and compute in each phase." >}}
 
 LLM inference has two phases, **prefill** and **decode**. In prefill, the model processes the whole prompt in one forward pass, building the KV cache and producing the first output token. Every prompt token is processed in parallel, so each weight read from memory is reused across many tokens. Prefill is therefore compute-bound and fast per token.
 
