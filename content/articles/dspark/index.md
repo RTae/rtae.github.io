@@ -9,9 +9,9 @@ Most speculative decoding papers optimize a number that does not survive contact
 
 <!--more-->
 
-## TLDR
+# TLDR
 
-## Why decoding is the bottleneck
+# 1. Why decoding is the bottleneck
 
 {{< figure src="decode-bottleneck.png" link="decode-bottleneck.png" alt="Two timelines. Prefill: one read of the weights, then a long compute bar over every prompt token, producing token 1. Decode: four steps, each a full read of the weights and KV cache with idle compute and a short compute sliver, producing one token per step." caption="Prefill reuses each weight read across the prompt; decode re-reads all weights and the KV cache for every token. Not to scale." >}}
 
@@ -21,7 +21,7 @@ Decode produces the rest of the output, one token per forward pass, because each
 
 There are many ways to tackle this problem, including prefill/decode disaggregation, quantization, hardware with more memory bandwidth (such as NVIDIA Rubin), and speculative decoding. This article focuses on speculative decoding.
 
-## What is speculative decoding?
+# 2. What is speculative decoding?
 
 Speculative decoding takes advantage of the gap described above. This is because decode is memory-bound, a forward pass over k tokens costs roughly the same as a pass over one token. So instead of asking the large *target* model for one token at a time, we let a cheap *drafter* guess the next k tokens, then have the target check all k of them in a single forward pass, which works like a small prefill. We keep the longest prefix the target agrees with, plus one token from the target itself, so every step produces at least one token. With rejection sampling, the output distribution is exactly the same as the target model's. The method is lossless, unlike quantization.
 
@@ -35,7 +35,7 @@ The speedup depends on two things. First, how cheap the draft is. Second, how ma
 
 - **Parallel drafter**: the drafter predicts all k tokens in a single forward pass. Drafting cost stays roughly constant as k grows, but each position is predicted without seeing the actual tokens before it, so the acceptance rate drops at later positions in the block. Popular methods include Medusa, PARD, DART, and DFlash.
 
-## What's wrong with the prior methods?
+# 3. What's wrong with the prior methods?
 
 {{< figure src="prior-ar.png" link="prior-ar.png" alt="Left: a symbolic chart where autoregressive drafting time rises linearly with block length while parallel drafting time stays flat. Right: a bar chart of acceptance at position 1, EAGLE-3 versus DFlash: 0.81 vs 0.88 on math and 0.53 vs 0.72 on chat." caption="Left: symbolic. Right: acceptance at position 1 (DSpark paper, Sec. 4.3.1)." >}}
 
@@ -57,19 +57,19 @@ Put together, the two families fail in opposite places. Autoregressive drafters 
 
 Prior methods either verify a fixed number of tokens or use a static confidence threshold to decide how many to verify. Neither looks at the current load. That works under single-request assumptions but is suboptimal in a high-concurrency production system. Before DSpark, DeepSeek's production serving used MTP-1, a single draft token, because deploying a static multi-token drafter (MTP-3 or MTP-5) degraded aggregate throughput under high concurrency.
 
-## How DSpark works
+# 4. How DSpark works
 
-### Semi-autoregressive generation
+## 4.1Semi-autoregressive generation
 
-### Confidence-scheduled verification
-#### Confidence Head
-#### Hardware-Aware Prefix Scheduler
+## 4.2 Confidence-scheduled verification
+### 4.2.1 Confidence Head
+### 4.2.2 Hardware-Aware Prefix Scheduler
 
-## Results
+# 5. Results
 
-### Experimental Setup
-### Experimental Results
-### Experimental Analysis
+## 5.1 Experimental Setup
+## 5.2 Experimental Results
+## 5.3 Experimental Analysis
 1. Why can Parallel drafter outperform Autoregressive drafter?
 2. A little Autoregressive drafter goes a long way
 3. Verify Smater, not Longer: The role of Confidence Scheduling
@@ -78,13 +78,15 @@ Prior methods either verify a fixed number of tokens or use a static confidence 
    2. Hareware-Aware Prefix Scheduler:
    3. High Throughput with Low Latency:
    4. Reult from real traffic:
-### Limitations and Future Work
+## 5.4 Limitations and Future Work
 
-## Demo with vLLM
+# 6. Demo
 
-## Demo with Deepinfer
+## 6.1 Demo with vLLM
 
-## Takeaways
+## 6.2 Demo with Deepinfer
+
+# 7 Takeaways
 
 ---
 
