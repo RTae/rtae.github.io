@@ -152,6 +152,27 @@
     font-weight: normal;
 }
 
+/* Headings inside an article body (the ## / ### / #### of the Markdown).
+   The theme renders every heading at the body font size, so in a long article
+   the sections blend into the text. These add a size step, and a primary-colour
+   bar on section headings, so the structure shows at a glance. Prefixed with
+   .terminal to outrank the theme's ".terminal h2" font-size rule. */
+.terminal article > h2 {
+    font-size: 1.4em;
+    margin-top: calc(var(--global-space) * 5);
+    padding-left: 0.6em;
+    border-left: 4px solid var(--primary-color);
+}
+
+.terminal article > h3 {
+    font-size: 1.15em;
+    margin-top: calc(var(--global-space) * 3);
+}
+
+.terminal article > h4 {
+    color: var(--secondary-color);
+}
+
 /* ---------------------------------------------------------------------------
    Inline icons (replacing jsDelivr / Wikimedia hotlinks)
 --------------------------------------------------------------------------- */
