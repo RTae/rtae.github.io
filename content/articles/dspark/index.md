@@ -11,7 +11,7 @@ Most speculative decoding papers optimize a number that does not survive contact
 
 ## TLDR
 
-TBD
+TBD this will be talk about over all of the feature
 
 ## 1. Why decoding is the bottleneck
 
@@ -70,19 +70,41 @@ Put together, the two families fail in opposite places. Autoregressive drafters 
 
 ### 4.1 Semi-autoregressive generation
 
+figure to show what is it
+
+describe how it work
+
 ### 4.2 Confidence-scheduled verification
+
+figure to show how it work
+
+describe how it work
 
 #### 4.2.1 Confidence Head
 
+figure
+
+describe
+
 #### 4.2.2 Hardware-Aware Prefix Scheduler
+
+figure
+
+describe
 
 ## 5. Results
 
 ### 5.1 Experimental Setup
 
+write a setup table is fine if from the paper is table
+
 ### 5.2 Experimental Results
 
+result from the table 
+  
 ### 5.3 Experimental Analysis
+
+also add a result and describe in each topic
 
 1. Why can Parallel drafter outperform Autoregressive drafter?
 2. A little Autoregressive drafter goes a long way
@@ -93,6 +115,7 @@ Put together, the two families fail in opposite places. Autoregressive drafters 
    3. High Throughput with Low Latency:
    4. Reult from real traffic:
 ### 5.4 Limitations and Future Work
+descirbe it 
 
 ## 6. Demo
 
