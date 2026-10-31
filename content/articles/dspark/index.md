@@ -1,17 +1,17 @@
 +++
 title = "DSpark: when speculative decoding starts caring about your batch"
 date = "2026-08-03"
-description = "A serving engineer's read of DSpark (arXiv:2607.05147) — how semi-autoregressive drafting fixes suffix decay, and why confidence-scheduled verification makes draft length a scheduling decision instead of a fixed hyperparameter."
+description = "A serving engineer's read of DSpark (arXiv:2607.05147) — how semi-autoregressive drafting reduces suffix decay, and why confidence-scheduled verification makes draft length a scheduling decision instead of a fixed hyperparameter."
 tags = ["llm-inference", "llm-serving", "paper-review"]
 +++
 
-Most speculative decoding papers optimize a number that does not survive contact with a production serving system: tokens accepted per request, measured at batch size one. DSpark is interesting because it optimizes the thing you actually get billed for, throughput under concurrency, and in doing so it treats draft length as a scheduling decision rather than a hyperparameter.
+Speculative decoding has a production problem. Verifying a few extra draft tokens may help one request, but under heavy load those tokens can consume GPU capacity that could have served other requests. DSpark solves this by estimating the chance that each draft token will be accepted and checking how busy the GPU is. When the GPU has spare capacity, it verifies more tokens. When the system is busy, it verifies fewer, because extra tokens would slow the whole batch. The goal is to keep total throughput high, rather than using a fixed number for every request.
 
 <!--more-->
 
 ## TLDR
 
-TBD this will be talk about over all of the feature
+DSpark combines a parallel drafting backbone with a tiny sequential Markov head to reduce suffix decay without paying for a full autoregressive drafter. It then uses calibrated token confidence and profiled GPU step times to choose how many draft tokens each request should verify under the current load. The authors report higher accepted lengths across four target models and substantial production throughput gains over MTP-1, although the production results have not been independently reproduced.
 
 ## 1. Why decoding is the bottleneck
 
