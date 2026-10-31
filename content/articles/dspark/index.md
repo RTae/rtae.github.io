@@ -68,54 +68,120 @@ Put together, the two families fail in opposite places. Autoregressive drafters 
 
 ## 4. How DSpark works
 
+DSpark fixes the problems from section 3 with two parts. The first is *semi-autoregressive generation*, which keeps the strong first position of a parallel drafter and fixes the decay after it. The second is *confidence-scheduled verification*, which decides how many draft tokens are worth sending to the target, based on how confident the drafter is and how busy the GPU is.
+
 ### 4.1 Semi-autoregressive generation
 
-figure to show what is it
+{{< figure src="semi-ar.png" link="semi-ar.png" alt="The input is an anchor token followed by mask tokens. A parallel backbone runs one heavy forward pass over the whole block and gives a base guess for each position, such as of or no for position 1 and course or problem for position 2. Then a tiny Markov head runs left to right, adding a bias from the previously sampled token at each position, so after of it picks course." caption="Illustrative: one heavy parallel pass, then a tiny Markov head left to right (paper, Sec. 3.1)." >}}
 
-describe how it work
+DSpark splits drafting into two stages. In the *parallel stage*, a heavy backbone (DFlash in the paper) runs one forward pass over the whole block and gives a base guess for every position. This is where most of the drafting work happens, so drafting time still stays roughly constant as the block grows. In the *sequential stage*, a tiny *Markov head* walks through the block from left to right. At each position, it adds a bias to the base guess that depends on the token just sampled, then samples the next token. For example, if both "of course" and "no problem" fit, the backbone alone guesses "of / no" and "course / problem". Once position 1 samples "of", the Markov head boosts "course" and suppresses "problem" at position 2, so the pair stays coherent.
+
+The Markov head has to be tiny because it runs once per position, one after another. The paper builds it as a low-rank lookup (rank 256 by default), so it costs almost nothing next to the backbone. The paper also tests an *RNN head* that remembers the whole prefix instead of only the previous token, but it only gives small extra gains. Therefore, the Markov head is the default.
 
 ### 4.2 Confidence-scheduled verification
 
-figure to show how it work
+{{< figure src="verify-round.png" link="verify-round.png" alt="One decoding round. After the context The quick brown fox, DSpark drafts jumps, over, a and lazy, each with a confidence. The prefix scheduler keeps jumps over a and drops lazy. The target verifies only the three kept tokens in one pass, accepts jumps and over, rejects a, and adds its own token the." caption="Illustrative: the scheduler keeps the confident prefix, and the target verifies only that (paper, Fig. 1)." >}}
 
-describe how it work
+Even with better drafts, verifying every drafted token is wasteful, because the last few tokens of a block are often rejected. DSpark adds two pieces to decide how much of each block to verify. A *confidence head* (4.2.1) gives each draft token a confidence, and a *hardware-aware prefix scheduler* (4.2.2) uses those confidences, together with the current GPU load, to choose how many tokens of each request to send to the target. In the figure, the scheduler keeps "jumps over a" and drops "lazy", so the target verifies only three tokens. The target then works like normal speculative decoding: it accepts "jumps over", rejects "a", and adds its own token "the". The paper shows that this scheduling keeps the output distribution exactly the same as the target model's.
 
 #### 4.2.1 Confidence Head
 
-figure
+{{< figure src="confidence-head.png" link="confidence-head.png" alt="Left: the backbone hidden state and the embedding of the previous draft token go through a linear layer and a sigmoid to give a confidence c_k. Right: with confidences 0.95, 0.90, 0.70 and 0.50, the prefix survival bars fall to 0.95, 0.85, 0.60 and 0.30. Below: Sequential Temperature Scaling calibrates the scores." caption="Bar values are illustrative; calibration numbers from the paper (Sec. 4.3.3)." >}}
 
-describe
+The confidence head is a small linear layer with a sigmoid on top. For each draft position k, it looks at the backbone's hidden state and the embedding of the previous draft token, and outputs a score c_k. This is the chance that token k is accepted, given that every token before it was accepted. During training, it learns to match the real acceptance rate, which the paper computes from how far the draft distribution is from the target's.
+
+Because the target only accepts a prefix, what the scheduler really needs is the *prefix survival*, that is, the chance that every token up to position k is accepted. This is simply c_1 × c_2 × … × c_k, so it always falls along the block. The paper also points out that raw neural confidence scores are usually too high. Therefore, DSpark calibrates them with *Sequential Temperature Scaling (STS)*, which fits one temperature per position, from left to right, on held-out data. It only rescales the scores, so their order does not change. In the paper, the raw head already ranks tokens well (ROC-AUC 0.81–0.90), and STS brings the calibration error down from 3–8% to about 1% (Sec. 4.3.3).
 
 #### 4.2.2 Hardware-Aware Prefix Scheduler
 
-figure
+{{< figure src="prefix-scheduler.png" link="prefix-scheduler.png" alt="The same three requests, code, math and chat, each with five draft tokens and their prefix survival values. At light load the scheduler verifies 13 of the 15 tokens; at heavy load it verifies only 9, keeping the most confident ones. Below, the three steps the scheduler follows to choose the cut-off." caption="Illustrative survival values; production numbers from the paper (Sec. 5.4)." >}}
 
-describe
+The scheduler looks at every request in the batch at once. It sorts all candidate draft tokens by prefix survival, then admits them one by one, from the most likely to be accepted to the least. Each admitted token adds expected accepted tokens, but it also makes the target's step bigger and slower. The step time comes from a table that is profiled once when the engine starts, and the scheduler stops at the batch size where the expected tokens per second is the highest. As a result, at light load extra tokens are almost free, so it verifies long prefixes, and at heavy load every extra token slows the whole batch, so only confident tokens make it. Because survival always falls along each block, sorting by survival keeps each request's verified tokens as a prefix automatically.
+
+In production, the paper makes two practical changes (Sec. 5.2). First, the real step time does not grow smoothly with batch size but jumps in steps, so the scheduler searches the whole table instead of stopping at the first drop. Second, the serving engine needs to know the next batch size before the current step finishes, so the scheduler uses confidences from two steps earlier to decide how many tokens fit, while still ranking the current tokens by their latest scores. The paper shows that this design stays lossless.
 
 ## 5. Results
 
+*All results in this section are reported by the DSpark authors in the paper; I have not reproduced them. Section and table numbers in parentheses refer to the paper.*
+
 ### 5.1 Experimental Setup
 
-write a setup table is fine if from the paper is table
+| Setting | From the paper (Sec. 4.1) |
+|---|---|
+| Target models | Qwen3-4B, Qwen3-8B, Qwen3-14B, Gemma4-12B |
+| Drafters | EAGLE-3 (autoregressive, 1 layer), DFlash (parallel, 5 layers), DSpark (5-layer backbone + Markov head) |
+| Block size | 7 for every drafter |
+| Training data | 1.3M prompts from Open-PerfectBlend (39.4% math, 38.9% code, 17.6% chat, 4.1% instruction following), with responses regenerated by each target model, 10 epochs |
+| Benchmarks | Math: GSM8K, MATH500, AIME25. Code: MBPP, HumanEval, LiveCodeBench. Chat: MT-Bench, Alpaca, Arena-Hard |
+| Decoding | Standard speculative decoding, temperature 1.0, chain drafting, non-thinking mode |
+| Metric | Accepted length per round, including the target's own token (higher is better) |
+
+All three drafters are retrained with the same framework and the same data. The confidence scheduler is turned off for these offline tests, so every drafter proposes a fixed block. This isolates the quality of the drafts.
 
 ### 5.2 Experimental Results
 
-result from the table 
-  
+| Target | Drafter | GSM8K | MATH | AIME25 | MBPP | HumanEval | LCB | MT-Bench | Alpaca | Arena-Hard |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Qwen3-4B | EAGLE-3 | 5.14 | 4.62 | 3.92 | 3.69 | 4.16 | 3.77 | 2.39 | 2.26 | 2.55 |
+| | DFlash | 5.40 | 4.85 | 4.15 | 4.40 | 4.74 | 4.18 | 3.07 | 2.96 | 2.83 |
+| | **DSpark** | **6.11** | **5.70** | **4.89** | **5.13** | **5.38** | **4.86** | **3.64** | **3.54** | **3.29** |
+| Qwen3-8B | EAGLE-3 | 5.30 | 4.77 | 3.91 | 3.96 | 4.33 | 4.17 | 2.66 | 2.54 | 2.54 |
+| | DFlash | 5.33 | 4.91 | 4.07 | 4.36 | 4.64 | 4.39 | 3.11 | 2.98 | 2.81 |
+| | **DSpark** | **6.17** | **5.78** | **5.01** | **5.16** | **5.52** | **5.17** | **3.72** | **3.58** | **3.21** |
+| Qwen3-14B | EAGLE-3 | 5.24 | 4.60 | 3.71 | 3.81 | 4.14 | 4.01 | 2.62 | 2.47 | 2.48 |
+| | DFlash | 5.41 | 4.84 | 3.98 | 4.44 | 4.59 | 4.33 | 3.10 | 2.94 | 2.72 |
+| | **DSpark** | **6.21** | **5.74** | **4.94** | **5.26** | **5.43** | **5.02** | **3.70** | **3.58** | **3.13** |
+| Gemma4-12B | EAGLE-3 | 5.87 | 5.46 | 4.83 | 4.72 | 5.37 | 4.16 | 3.19 | 3.06 | 2.72 |
+| | DFlash | 5.45 | 5.04 | 4.22 | 4.39 | 4.95 | 3.70 | 2.98 | 2.84 | 2.59 |
+| | **DSpark** | **6.05** | **5.78** | **5.12** | **5.11** | **5.64** | **4.51** | **3.49** | **3.35** | **2.92** |
+
+*Accepted length per round, from the paper's Table 1. LCB is LiveCodeBench.*
+
+DSpark has the longest accepted length on every benchmark and every target model. On Qwen3-4B, 8B and 14B, it improves the average accepted length over EAGLE-3 by 30.9%, 26.7% and 30.0%, and over DFlash by 16.3%, 18.4% and 18.3% (Sec. 4.2). The gains also hold on Gemma4-12B, which is a different model family.
+
+Two more things stand out in the table. First, acceptance depends a lot on the domain. For Qwen3-4B, DSpark keeps 5.57 tokens per round on math and 5.12 on code, but only 3.49 on chat. This variance is exactly why a fixed verification length wastes compute, and it motivates the confidence scheduler. Second, from my reading of the table, EAGLE-3 beats DFlash on every Gemma4-12B benchmark, so a pure parallel drafter is not always the stronger baseline, but DSpark still beats both.
+
 ### 5.3 Experimental Analysis
 
-also add a result and describe in each topic
+**1. Why can a parallel drafter outperform an autoregressive drafter?** (Sec. 4.3.1)
 
-1. Why can Parallel drafter outperform Autoregressive drafter?
-2. A little Autoregressive drafter goes a long way
-3. Verify Smater, not Longer: The role of Confidence Scheduling
-4. For production results.
-   1. Scalability:
-   2. Hareware-Aware Prefix Scheduler:
-   3. High Throughput with Low Latency:
-   4. Reult from real traffic:
+At the first draft position, every drafter sees only the context, so the difference comes from network size. A parallel drafter can afford a deep network, but an autoregressive drafter cannot. This is why DFlash starts at 0.88 on math and 0.72 on chat, against 0.81 and 0.53 for EAGLE-3. Because a miss at the first position throws away the whole block, this head start outweighs DFlash's decay at later positions, so parallel drafters come out ahead overall. DSpark keeps the high start of the deep parallel backbone (0.93 on math at the first position), and its Markov head keeps the conditional acceptance high and stable through the rest of the block.
+
+**2. A little autoregression goes a long way** (Sec. 4.3.2, Qwen3-4B)
+
+- **Depth:** with a block size of 7, DSpark gets better with every extra layer from 1 to 5, and the biggest jump is from 1 to 2 layers. A 2-layer DSpark already beats the 5-layer DFlash in every domain.
+- **Block length:** DSpark beats DFlash at every block length the paper tests, and the gap grows with the block. With 7 proposed tokens, DSpark accepts 16% more on math, 15% more on code and 18% more on chat. With 15 proposed tokens, the gains grow to 30%, 26% and 22%. The RNN head adds only small extra gains, mainly at longer blocks.
+- **Cost:** at a batch size of 128, growing the draft from 4 to 16 tokens adds only 0.2% to 1.3% to the full round latency compared with DFlash, while the accepted length improves by up to 30%.
+
+**3. Verify smarter, not longer: the role of confidence scheduling** (Sec. 4.3.3, Qwen3-4B)
+
+The paper first tests the confidence head alone, with a static threshold that drops draft tokens below a confidence. As the threshold rises, the dropped tokens are mostly ones that would have been rejected anyway, so the acceptance rate of what remains goes up: from 45.7% to 95.7% on chat, 76.9% to 92.5% on math, and 67.6% to 92.0% on code. Chat gains the most because its later tokens are rejected the most. However, a static threshold ignores the system load, which is why production uses the hardware-aware scheduler instead. For that, the scores must also be calibrated: the raw head ranks tokens well (ROC-AUC 0.81–0.90) but is overconfident (calibration error 3–8%), and STS brings the error down to about 1%.
+
+**4. Production results** (Sec. 5, DeepSeek-V4-Flash and V4-Pro previews, DSpark with up to 5 draft tokens against the previous MTP-1 setup)
+
+- **Scalability:** the production drafter is three MoE layers with a sliding window attention of 128, plus the Markov head. Training it needs the target model's output distributions, so the paper adds two tricks: workers exchange hidden states instead of full-vocabulary logits, and training packs short blocks around sampled anchor positions, so the draft model's cost does not grow with the target's long contexts.
+- **Hardware-aware prefix scheduler:** the scheduler runs one step ahead, using confidences from two steps earlier, so it fits the serving engine's zero-overhead scheduling and CUDA graphs. It also searches the whole step-time table, because the real step time jumps in steps. The paper shows this design is still lossless.
+- **High throughput with low latency:** in DeepSeek's deployment, the batch stays well below the point where the GPU's compute is saturated, because of per-request KV cache limits and the available traffic. Therefore, higher total throughput and faster per-user speed go together instead of trading off. To verify a different number of tokens for each request in one batch, the kernels flatten all tokens and track which request each one belongs to. On DeepSeek-V4, only the index-attention and compress kernels needed changes.
+- **Results from real traffic:** at moderate load (fewer than 200 concurrent requests on V4-Flash and 150 on V4-Pro), the scheduler verifies about 4–6 tokens per request, against MTP-1's fixed 2, and it shrinks this budget as the load grows. DSpark replaced MTP-1 in production two weeks after the DeepSeek-V4 preview release.
+
+| Engine | Per-user speed target (SLA) | Throughput vs. MTP-1 | Per-user speed at matched throughput |
+|---|---|---|---|
+| V4-Flash | 80 tok/s/user | +51% | 60–85% faster |
+| V4-Flash | 120 tok/s/user | +661% (nominal) | |
+| V4-Pro | 35 tok/s/user | +52% | 57–78% faster |
+| V4-Pro | 50 tok/s/user | +406% (nominal) | |
+
+*From the paper's Sec. 5.4.* At the stricter speed targets, MTP-1 can only serve a very small batch, so the paper reads the +661% and +406% as DSpark extending what is reachable, not as typical speedups.
+
 ### 5.4 Limitations and Future Work
-descirbe it 
+
+From the paper: the scheduler cuts wasted verification on the target, but the drafter still pays a fixed cost to generate the full block with its parallel backbone. For hard requests with low acceptance, that drafting work is wasted. The authors suggest difficulty-aware early exit inside the drafter, so these requests can skip generating the full block.
+
+From my reading, a few more things to keep in mind:
+
+- **Hard to reproduce:** the production numbers come from DeepSeek's own engine and traffic, and they are compared only with MTP-1, so they cannot be checked outside DeepSeek or compared directly with other serving systems.
+- **Offline results measure acceptance, not speed:** the main table reports accepted length with the scheduler turned off, so it shows draft quality rather than end-to-end speedup.
+- **Integration cost:** the scheduler needs a step-time table profiled for each engine and kernels that can verify a different number of tokens per request, which is real work for any engine that wants to adopt it.
 
 ## 6. Demo
 
