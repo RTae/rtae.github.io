@@ -27,7 +27,7 @@ There are many ways to tackle this problem, including prefill/decode disaggregat
 
 Speculative decoding leverages this memory-bound regime. At small batches, a target-model forward pass that verifies k draft tokens can cost roughly the same as a one-token decode step because both read the weights once, although attention, KV-cache traffic, and batching eventually make longer verification more expensive. Instead of querying the large target model for one token at a time, a cheaper drafter proposes the next k tokens, and the target evaluates them in one forward pass, functioning similarly to a small prefill.
 
-With greedy decoding, the system keeps the longest prefix matching the target, replaces the first mismatch with the target's token, or adds one target token if every draft matches. With sampled decoding, speculative rejection sampling accepts tokens probabilistically and draws from a correction distribution after a rejection; if every draft is accepted, it adds one target token. Both procedures preserve the target model's output distribution, and every round produces at least one token.
+With greedy decoding, the system keeps the longest prefix matching the target, replaces the first mismatch with the target's token, or adds one target token if every draft matches. With sampled decoding, speculative rejection sampling accepts tokens probabilistically and draws from a correction distribution after a rejection. If every draft is accepted, it adds one target token. Both procedures preserve the target model's output distribution, and every round produces at least one token.
 
 Token counts are easy to conflate. Here, *draft length* excludes the target's token. The paper's *verification length* counts scheduled draft tokens, while its production *verification budget* also includes one target token per request. A five-token draft therefore gives a maximum budget of six. *Accepted length* counts tokens emitted per round, including the target's token.
 
@@ -63,16 +63,14 @@ The paper measures *conditional acceptance* at each position, that is, how often
 
 ### 3.3 Verification length
 
-{{< figure src="prior-verify.png" link="prior-verify.png" alt="Left: with a fixed length of six draft tokens, a code request keeps five and a chat request keeps one. Right: at light load a target step has idle slots, so rejected tokens are cheap; at heavy load every slot is full, rejected tokens take room, and a fifth request waits." caption="Illustrative: acceptance varies by request, and rejected tokens cost more under heavy load." >}}
+{{< figure src="prior-verify.png" link="prior-verify.png" alt="Left: with a fixed length of six draft tokens, a code request keeps five and a chat request keeps one. Right: at light load a target step has idle slots, so rejected tokens are cheap. At heavy load every slot is full, rejected tokens take room, and a fifth request waits." caption="Illustrative: acceptance varies by request, and rejected tokens cost more under heavy load." >}}
 
 Parallel drafting makes long blocks cheap to produce, but verifying every drafted token is not cheap. The ideal verification length changes along two axes.
 
 - **Data:** acceptance depends on the request. Structured text such as code sustains much higher acceptance than open-ended chat, so any single length is too short for some requests and too long for others.
 - **System load:** at light load, verifying an extra token can be nearly free when the GPU has idle capacity and is waiting on memory anyway, so even a rejected token costs almost nothing. Under heavy load, every token sent for verification adds to the batch the target model processes in that step, and the step gets slower as that batch grows. A token that is likely to be rejected takes batch capacity that could have served another request.
 
-Put together, the two families fail in opposite places. Autoregressive drafters are weak at the first position, and parallel drafters get weaker at later ones. The first position matters most, because a miss there throws away the whole block. In the paper's main Qwen comparisons, this advantage lets parallel drafters come out ahead despite their decay; the Gemma4-12B results in Section 5.2 are an exception.
-
-DSpark targets this gap by retaining the parallel drafter's strong first position while reducing decay at later positions.
+Put together, the two families fail in opposite places. Autoregressive drafters are weak at the first position, and parallel drafters get weaker at later ones. The first position matters most, because a miss there throws away the whole block.  DSpark targets this gap by retaining the parallel drafter's strong first position while reducing decay at later positions.
 
 Prior methods also either verify a fixed number of tokens or use a static confidence threshold. Neither accounts for current system load. That can work under single-request assumptions, but it is suboptimal in a high-concurrency production system. Before DSpark, DeepSeek's production serving used MTP-1, a single draft token, because deploying a static multi-token drafter (MTP-3 or MTP-5) degraded aggregate throughput under high concurrency.
 
