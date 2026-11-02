@@ -1,6 +1,6 @@
 +++
 title = "DSpark: when speculative decoding starts caring about your batch"
-date = "2026-11-07"
+date = "2026-11-01"
 description = "A serving engineer's read of DSpark (arXiv:2607.05147) — how semi-autoregressive drafting reduces suffix decay, and why confidence-scheduled verification makes draft length a scheduling decision instead of a fixed hyperparameter."
 tags = ["llm-inference", "llm-serving", "paper-review"]
 +++
@@ -90,11 +90,11 @@ Even with better drafts, verifying every drafted token is wasteful because the l
 
 #### 4.2.1 Confidence Head
 
-{{< figure src="confidence-head.png" link="confidence-head.png" alt="Left: the backbone hidden state and previous draft token embedding pass through a linear layer and sigmoid to produce c_k. Right: per-token confidences 0.95, 0.90, 0.70, and 0.50 multiply into prefix survival bars 0.95, 0.85, 0.60, and 0.30." caption="Left: computing per-token confidence c_k. Right: multiplying c_k into prefix survival probabilities (bar values illustrative; calibration error from Sec. 4.3.3)." >}}
+{{< figure src="confidence-head.png" link="confidence-head.png" alt="Step 1: backbone state h_k and previous token embedding pass through a linear layer and sigmoid to produce raw c_k. Step 2: Sequential Temperature Scaling (STS) divides logits by position-specific temperatures T_k to align overconfident raw scores with true acceptance. Step 3: calibrated c_k values (0.95, 0.90, 0.70, 0.50) multiply into falling prefix survival bars (0.95, 0.85, 0.60, 0.30)." caption="From per-token confidence to prefix survival: (1) computing raw c_k, (2) calibrating with STS, and (3) multiplying into prefix survival a_k (illustrative values; calibration error from Sec. 4.3.3)." >}}
 
-As shown on the left of the figure, the confidence head is a small linear layer with a sigmoid on top. For each draft position k, it looks at the backbone's hidden state and the embedding of the previous draft token, and outputs a score c_k. This is the chance that token k is accepted, given that every token before it was accepted. During training, it learns to match the real acceptance rate, which the paper computes from how far the draft distribution is from the target's.
+As shown in Step 1 of the figure, the confidence head is a small linear layer with a sigmoid on top. For each draft position k, it looks at the backbone's hidden state and the embedding of the previous draft token, and outputs a score c_k. This is the chance that token k is accepted, given that every token before it was accepted. During training, it learns to match the real acceptance rate, which the paper computes from how far the draft distribution is from the target's.
 
-Each score c_k only covers one position, while the target model accepts draft tokens as a continuous prefix. To get the chance that every token up to position k is accepted, DSpark multiplies the scores together into a *prefix survival* probability, c_1 × c_2 × … × c_k (right side of the figure), which never increases as you move further into the block. However, raw neural network scores are usually overconfident, which would make these survival estimates too high. DSpark calibrates them with *Sequential Temperature Scaling (STS)*, which fits one temperature per position from left to right on held-out data. This rescales the scores to match real acceptance rates without changing their order, reducing the calibration error from 3–8% to about 1%.
+Each score c_k only covers one position, while the target model accepts draft tokens as a continuous prefix. However, raw neural network scores are usually overconfident, which would make prefix estimates too high. As shown in Step 2, DSpark calibrates them with *Sequential Temperature Scaling (STS)*, fitting one temperature per position from left to right on held-out data. This rescales the scores to match real acceptance rates without changing their order, reducing the calibration error from 3–8% to about 1%. In Step 3, DSpark multiplies these calibrated scores together into a *prefix survival* probability, c_1 × c_2 × … × c_k, which gives the chance that every token up to position k is accepted and never increases along the block.
 
 #### 4.2.2 Hardware-Aware Prefix Scheduler
 
@@ -236,10 +236,10 @@ curl http://localhost:8000/v1/chat/completions \
 
 ## 7. Takeaways
 
-+- **Drafting and verification solve different problems.** A deep parallel backbone with a tiny Markov head makes it cheap to draft long, coherent blocks, while a separate scheduler decides how many of those tokens are worth sending to the target model.
-+- **Accepted tokens per round is not the only metric that matters.** In production, the real goal is total system throughput within your latency target, which depends on batch load as much as draft accuracy.
-+- **Draft length works best as a live scheduling choice.** Checking more draft tokens pays off when the GPU has spare room, and checking fewer protects the batch when traffic is heavy.
-+- **The drafter is easy to try today, while the scheduler is engine work.** You can run the open-source DSpark drafters in vLLM on a single GPU right now, whereas getting the high-concurrency serving gains from the paper requires confidence calibration, profiled step-time tables, and variable-length verification kernels.
+- **Drafting and verification solve different problems.** A deep parallel backbone with a tiny Markov head makes it cheap to draft long, coherent blocks, while a separate scheduler decides how many of those tokens are worth sending to the target model.
+- **Accepted tokens per round is not the only metric that matters.** In production, the real goal is total system throughput within your latency target, which depends on batch load as much as draft accuracy.
+- **Draft length works best as a live scheduling choice.** Checking more draft tokens pays off when the GPU has spare room, and checking fewer protects the batch when traffic is heavy.
+- **The drafter is easy to try today, while the scheduler is engine work.** You can run the open-source DSpark drafters in vLLM on a single GPU right now, whereas getting the high-concurrency serving gains from the paper requires confidence calibration, profiled step-time tables, and variable-length verification kernels.
 
 ---
 
