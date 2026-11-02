@@ -17,9 +17,9 @@ DSpark combines a parallel drafting backbone with a tiny sequential Markov head 
 
 {{< figure src="decode-bottleneck.png" link="decode-bottleneck.png" alt="Top: in prefill, model weights are read once from HBM and shared across all prompt tokens in one compute-bound pass. Bottom: in decode, every step re-reads the weights and the growing KV cache to produce a single token, leaving compute waiting on memory." caption="Prefill reuses one weight read across the whole prompt, while decode re-reads weights and the KV cache for each new token" >}}
 
-LLM inference has two phases, prefill and decode. In prefill (top of the figure), the model processes the whole prompt in one forward pass, building the KV cache and producing the first output token. Every prompt token is processed in parallel, so each weight read from memory is reused across many tokens. For sufficiently large prompts, prefill is generally compute-bound. It spends most of its time computing rather than waiting for data.
+LLM inference has two phases, prefill and decode. In prefill, shown at the top of the figure, the model processes the whole prompt in one forward pass, building the KV cache and producing the first output token. Every prompt token is processed in parallel, so each weight read from memory is reused across many tokens. For sufficiently large prompts, prefill is generally compute-bound. It spends most of its time computing rather than waiting for data.
 
-Decode (bottom of the figure) produces the remaining tokens one step at a time until the model emits an end-of-sequence token or reaches the output's maximum length. Each token depends on the previous one, so every step reads the model weights and KV cache from GPU memory to produce the next token. At small batches, there is little computation for each byte read, and the KV-cache reads grow with the output, so the GPU spends much of its time waiting for data. As a result, this phase usually dominates end-to-end latency.
+Decode, shown at the bottom of the figure, produces the remaining tokens one step at a time until the model emits an end-of-sequence token or reaches the output's maximum length. Each token depends on the previous one, so every step reads the model weights and KV cache from GPU memory to produce the next token. At small batches, there is little computation for each byte read, and the KV-cache reads grow with the output, so the GPU spends much of its time waiting for data. As a result, this phase usually dominates end-to-end latency.
 
 There are many ways to tackle this problem, including prefill/decode disaggregation (so long prefills don't stall decoding), quantization (fewer bytes to read), hardware with more memory bandwidth (such as NVIDIA Rubin), and speculative decoding (more tokens per read). This article focuses on speculative decoding.
 
@@ -47,7 +47,7 @@ The drafter predicts all k tokens in a single forward pass. Drafting cost stays 
 
 {{< figure src="prior-ar.png" link="prior-ar.png" alt="Left: drafter passes grow linearly with block length k for an autoregressive drafter while staying at 1 for a parallel drafter. Right: first-position acceptance is 0.81 vs. 0.88 on math and 0.53 vs. 0.72 on chat for EAGLE-3 vs. DFlash." caption="Left: drafter passes per block. Right: acceptance at position 1, EAGLE-3 vs. DFlash" >}}
 
-Each draft token needs its own drafter forward pass (left panel), so drafting latency grows linearly with the block length. To keep that latency low, these drafters use short blocks and shallow networks, then use tree-based verification to compensate for the short blocks by verifying several candidate paths at once. This sends more tokens to the target model and can reduce aggregate serving throughput under concurrency. A shallow network is also less accurate, and this matters most at the first draft position. The target only accepts a prefix, so if the first draft token is wrong, the whole block is thrown away. As shown on the right, EAGLE-3 is accepted less often at the first position than DFlash, a parallel drafter that can afford a much deeper network (0.81 vs. 0.88 on math, and 0.53 vs. 0.72 on chat).
+As shown on the left of the figure, each draft token needs its own drafter forward pass, so drafting latency grows linearly with the block length. To keep that latency low, these drafters use short blocks and shallow networks, then use tree-based verification to compensate for the short blocks by verifying several candidate paths at once. This sends more tokens to the target model and can reduce aggregate serving throughput under concurrency. A shallow network is also less accurate, and this matters most at the first draft position. The target only accepts a prefix, so if the first draft token is wrong, the whole block is thrown away. As shown on the right, EAGLE-3 is accepted less often at the first position than DFlash, a parallel drafter that can afford a much deeper network, with 0.81 vs. 0.88 on math and 0.53 vs. 0.72 on chat.
 
 ### 3.2 Parallel drafters
 
@@ -63,8 +63,8 @@ The right panel plots *conditional acceptance* at each position, that is, how of
 
 Parallel drafting makes long blocks cheap to produce, but verifying every drafted token is not cheap. The ideal verification length changes along two axes.
 
-- **Data (left panel):** acceptance depends on the request. Structured text such as code sustains much higher acceptance than open-ended chat, so any single length is too short for some requests and too long for others.
-- **System load (right panel):** at light load, verifying an extra token can be nearly free when the GPU has idle capacity and is waiting on memory anyway, so even a rejected token costs almost nothing. Under heavy load, every token sent for verification adds to the batch the target model processes in that step, and the step gets slower as that batch grows. A token that is likely to be rejected takes batch capacity that could have served another request.
+- **Data:** on the left of the figure, acceptance depends on the request. Structured text such as code sustains much higher acceptance than open-ended chat, so any single length is too short for some requests and too long for others.
+- **System load:** on the right of the figure, verifying an extra token at light load can be nearly free when the GPU has idle capacity and is waiting on memory anyway, so even a rejected token costs almost nothing. Under heavy load, every token sent for verification adds to the batch the target model processes in that step, and the step gets slower as that batch grows. A token that is likely to be rejected takes batch capacity that could have served another request.
 
 Put together, the two families fail in opposite places. Autoregressive drafters are weak at the first position, and parallel drafters get weaker at later ones. The first position matters most since a miss there throws away the whole block. DSpark targets this gap by retaining the parallel drafter's strong first position while reducing decay at later positions.
 
@@ -100,11 +100,11 @@ Each score c_k only covers one position, while the target model accepts draft to
 
 {{< figure src="prefix-scheduler.png" link="prefix-scheduler.png" alt="Step 1: three requests (code, math, chat) with five draft tokens each and decreasing prefix survival. Step 2: pooling and sorting all candidate tokens against profiled step time shows expected tok/s peaking at 9 tokens under heavy load and 13 tokens under light load. Step 3: the resulting kept prefixes under light load (13 of 15) and heavy load (9 of 15)." caption="Hardware-aware prefix scheduler: (1) per-request prefix survival, (2) global ranking and step-time cutoff, and (3) selected prefixes under light vs. heavy load" >}}
 
-With the survival scores ready, the scheduler has to decide how many draft tokens to send to the target model across the whole batch (Step 1 in the figure). Sending another draft token can produce more accepted output, but it also makes the target model's batch larger and slower to run. To find the best balance, the scheduler pools all draft tokens from every request, ranks them by their survival score from highest to lowest, and adds them one by one (Step 2). A later token in a request never has a higher survival score than an earlier one, so this ranking always takes tokens from the start of each request's draft. For each batch size, the scheduler looks up the step time from a table profiled at startup and picks the point that yields the most expected accepted tokens per second. As shown in Step 3, when load is light (left), extra tokens barely slow the step down, so the scheduler verifies 13 of the 15 draft tokens. When load is heavy (right), every extra token slows the whole batch, so only the 9 highest-survival tokens make the cut.
+With the survival scores ready, the scheduler has to decide how many draft tokens to send to the target model across the whole batch. Sending another draft token can produce more accepted output, but it also makes the target model's batch larger and slower to run. To find the best balance, the scheduler pools all draft tokens from every request, ranks them from highest to lowest survival, and adds them one by one. A later token in a request never has a higher survival score than an earlier one, so this ranking always takes tokens from the start of each request's draft. For each batch size, the scheduler looks up the step time from a table profiled at startup and picks the point that gives the most expected accepted tokens per second. In the figure above, light load barely slows down as tokens are added, so the scheduler verifies 13 of the 15 draft tokens. Under heavy load, every extra token slows the whole batch, so only the 9 highest-survival tokens make the cut.
 
-{{< figure src="scheduler-production.png" link="scheduler-production.png" alt="Left: GPU step time rises in flat plateaus and sharp jumps at tile boundaries, creating a local dip in expected tok/s before the true global peak. Right: while Step t-1 runs on the GPU, the CPU uses Step t-2 confidences to lock the batch size budget B* early, then fills those B* slots with the latest Step t scores." caption="Two production adjustments: (1) searching the full step-time table past tile-boundary dips, and (2) using two-step lookback to size the batch without stalling the GPU pipeline (paper, Sec. 5.2)." >}}
+{{< figure src="scheduler-production.png" link="scheduler-production.png" alt="Left: GPU step time rises in flat plateaus and sharp jumps at tile boundaries, creating a local dip in expected tok/s before the true global peak. Right: while Step t-1 runs on the GPU, the CPU uses Step t-2 confidences to lock the batch size budget B* early, then fills those B* slots with the latest Step t scores." caption="Two production adjustments: searching the full step-time table past tile-boundary dips, and using two-step lookback to size the batch without stalling the GPU pipeline" >}}
 
-Running this in a production serving engine takes two small adjustments, illustrated above. First (left panel), GPU step time does not rise smoothly as the batch grows. It stays flat across a plateau and then spikes up when a hardware tile fills, which creates local dips in expected tokens per second. Instead of stopping at the first dip, the scheduler checks the whole step-time table to find the true peak. Second (right panel), the engine prepares the next batch while the GPU is still running the current one, so it cannot wait for the newest confidence scores to pick the batch size. DSpark gets around this by using scores from two steps earlier (`Step t-2`) to lock in the batch budget `B*` early, then filling those `B*` slots with the latest scores (`Step t`) once they arrive.
+Running this in a production serving engine takes two small adjustments, shown in the figure above. On the left, GPU step time does not rise smoothly as the batch grows. It stays flat across a plateau and then spikes up when a hardware tile fills, which creates local dips in expected tokens per second. Instead of stopping at the first dip, the scheduler checks the whole step-time table to find the true peak. On the right, the engine prepares the next batch while the GPU is still running the current one, so it cannot wait for the newest confidence scores to pick the batch size. DSpark gets around this by using scores from two steps earlier to lock in how many tokens fit in the batch, then filling those slots with the latest scores once they arrive.
 
 ## 5. Results
 
@@ -185,66 +185,71 @@ One limitation noted in the paper is that the scheduler only saves work on the t
 
 From my perspective, a few more trade-offs are worth keeping in mind.
 
-- **Offline tables measure draft quality, not wall-clock speed:** Table 1 runs with the confidence scheduler turned off and a fixed block size of 7. That is a clean way to isolate drafter accuracy, but end-to-end speedup still depends on drafter overhead, batch size, and target step time.
-- **A 1D step-time table assumes balanced contexts:** Profiling step time only by verified token count `B` works well in DeepSeek's disaggregated decode setup where context lengths are balanced across ranks. In smaller deployments where short chat prompts and long-context RAG requests share one GPU batch, step time depends on both token count `B` and KV-cache bytes read, so a 1D table can misjudge the cutoff.
-- **Two-step lookback lags sudden shifts in difficulty:** Sizing step `t`'s batch budget from step `t-2` confidences keeps CUDA graphs and zero-overhead scheduling intact, but if a request suddenly shifts from predictable boilerplate to open-ended reasoning, the batch budget trails that change by two rounds.
-- **Production gains are tied to DeepSeek's stack:** The live serving numbers come from DeepSeek's internal engine and traffic against MTP-1. Bringing the full system to open-source engines like vLLM or SGLang takes real systems work, including per-model confidence calibration, hardware step-time profiling, and ragged verification kernels.
+- **Offline tables measure draft quality, not speed:** Table 1 runs with the confidence scheduler turned off and a fixed block size of 7. That is a clean way to compare drafters, but real end-to-end speedup still depends on drafter overhead, batch size, and target step time.
+- **Using scores from two steps ago can lag sudden changes:** Picking the batch size from two steps earlier works well when acceptance stays steady from round to round. If a request suddenly switches from predictable code to open-ended writing, the batch budget takes two rounds to catch up.
 
 ## 6. Demo
 
-DeepSeek released the pretrained DSpark drafter checkpoints on [Hugging Face](https://huggingface.co/collections/deepseek-ai/deepspec) along with the [DeepSpec](https://github.com/deepseek-ai/DeepSpec) training and evaluation code, and vLLM supports DSpark drafting through `--speculative-config`. On a single 48 GB RTX 6000, `Qwen/Qwen3-8B` paired with its 7-token DSpark drafter (`deepseek-ai/dspark_qwen3_8b_block7`) fits comfortably in `bf16` (or you can use `Qwen/Qwen3-4B` with `deepseek-ai/dspark_qwen3_4b_block7` on smaller GPUs).
+You only need **one GPU** to test both halves of DSpark in [vLLM](https://docs.vllm.ai/en/stable/features/speculative_decoding/adaptive_verification/). While DeepSeek-V4 itself is a multi-node MoE model, DeepSeek released single-GPU DSpark checkpoints on [Hugging Face](https://huggingface.co/collections/deepseek-ai/deepspec) for `Qwen3-4B`, `Qwen3-8B`, `Qwen3-14B`, and `Gemma4-12B` that include both the Markov head and the trained confidence head.
 
-Note that open-source vLLM currently runs DSpark's semi-autoregressive drafter from Section 4.1 with a fixed block size, while the load-aware prefix scheduler from Section 4.2.2 is part of DeepSeek's internal engine.
+On a single **48 GB RTX 6000**, `Qwen/Qwen3-8B` (~16 GB in `bf16`) plus its 7-token DSpark drafter (`deepseek-ai/dspark_qwen3_8b_block7`, ~2 GB) leaves over 25 GB of VRAM for the KV cache, which is enough to run 64+ concurrent requests on one card (or use `Qwen/Qwen3-4B` + `deepseek-ai/dspark_qwen3_4b_block7` on a 24 GB GPU).
 
-### Step 1. Pull the vLLM nightly image
+### Step 1. Pull the vLLM image
 
-DSpark support landed in vLLM nightly, so start by pulling the nightly container (or installing the nightly wheel in a fresh Python environment).
+vLLM supports both `"method": "dspark"` and confidence-scheduled verification (`"enable_adaptive_verification": true`).
 
 ```bash
-docker pull vllm/vllm-openai:nightly
+docker pull vllm/vllm-openai:latest
 ```
 
-### Step 2. Launch vLLM with DSpark enabled
+### Step 2. Launch vLLM with DSpark and adaptive verification
 
-Pass `--speculative-config` with `"method": "dspark"` and point `"model"` at the matching DSpark checkpoint. The released Qwen3 drafters were trained with thinking mode turned off, so disable thinking in the chat template to match the training distribution.
+Pass `--speculative-config` with `"method": "dspark"` and `"enable_adaptive_verification": true`. At startup, vLLM profiles step times from captured CUDA graphs and uses the checkpoint's confidence head to trim low-survival draft tokens as batch load grows. The released Qwen3 drafters were trained with thinking mode turned off, so disable thinking in the chat template to match.
 
 ```bash
 docker run --rm --gpus all --ipc=host -p 8000:8000 \
   -v ~/.cache/huggingface:/root/.cache/huggingface \
-  vllm/vllm-openai:nightly \
+  vllm/vllm-openai:latest \
   --model Qwen/Qwen3-8B \
   --served-model-name qwen3-dspark \
   --max-model-len 16384 \
   --gpu-memory-utilization 0.85 \
   --default-chat-template-kwargs '{"enable_thinking": false}' \
-  --speculative-config '{"method":"dspark","model":"deepseek-ai/dspark_qwen3_8b_block7","num_speculative_tokens":7,"attention_backend":"FLASH_ATTN"}'
-```
-
-To compare against plain decoding on the same RTX 6000, run the exact same command without the `--speculative-config` line.
-
-### Step 3. Send a test request and compare speed
-
-Once the server is ready, send an OpenAI-compatible chat completion request to port `8000`. Structured prompts like math or code show the largest jump in accepted draft tokens and output speed, while open-ended chat sees a smaller but steady gain.
-
-```bash
-curl http://localhost:8000/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "qwen3-dspark",
-    "messages": [
-      {"role": "user", "content": "Write a Python function for binary search and explain its time complexity."}
-    ],
-    "max_tokens": 512,
-    "temperature": 0.0
+  --speculative-config '{
+    "method": "dspark",
+    "model": "deepseek-ai/dspark_qwen3_8b_block7",
+    "num_speculative_tokens": 7,
+    "enable_adaptive_verification": true
   }'
 ```
+
+### Step 3. Compare low vs. high concurrency on one GPU
+
+To see why adaptive verification matters on a single RTX 6000, benchmark three setups with `vllm bench serve` at `--max-concurrency 1` (light load) and `--max-concurrency 64` (heavy load):
+
+1. **No speculation:** launch without `--speculative-config`.
+2. **Fixed DSpark:** set `"enable_adaptive_verification": false` so vLLM verifies all 7 draft tokens on every request.
+3. **Adaptive DSpark:** set `"enable_adaptive_verification": true` so vLLM verifies long prefixes at concurrency 1 and trims low-confidence tails at concurrency 64.
+
+```bash
+# Light load (1 request at a time)
+vllm bench serve --model qwen3-dspark --dataset-name sharegpt --num-prompts 100 --max-concurrency 1
+
+# Heavy load (64 concurrent requests on the same RTX 6000)
+vllm bench serve --model qwen3-dspark --dataset-name sharegpt --num-prompts 200 --max-concurrency 64
+```
+
+<!-- Drop your RTX 6000 demo screenshot here, for example:
+{{< figure src="demo-vllm-rtx6000.png" link="demo-vllm-rtx6000.png" alt="vLLM serving Qwen3-8B with DSpark and adaptive verification on an RTX 6000." caption="Comparing baseline, fixed DSpark, and adaptive DSpark on a single RTX 6000 in vLLM." >}}
+-->
+
+Note that open-source vLLM currently runs DSpark's semi-autoregressive drafter from Section 4.1 with a fixed block size, while the load-aware prefix scheduler from Section 4.2.2 is part of DeepSeek's internal engine.
 
 ## 7. Takeaways
 
 - **Drafting and verification solve different problems.** A deep parallel backbone with a tiny Markov head makes it cheap to draft long, coherent blocks, while a separate scheduler decides how many of those tokens are worth sending to the target model.
 - **Accepted tokens per round is not the only metric that matters.** In production, the real goal is total system throughput within your latency target, which depends on batch load as much as draft accuracy.
 - **Draft length works best as a live scheduling choice.** Checking more draft tokens pays off when the GPU has spare room, and checking fewer protects the batch when traffic is heavy.
-- **The drafter is easy to try today, while the scheduler is engine work.** You can run the open-source DSpark drafters in vLLM on a single GPU right now, whereas getting the high-concurrency serving gains from the paper requires confidence calibration, profiled step-time tables, and variable-length verification kernels.
 
 ---
 
