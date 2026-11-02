@@ -1,6 +1,6 @@
 +++
 title = "DSpark: when speculative decoding starts caring about your batch"
-date = "2026-08-03"
+date = "2026-11-07"
 description = "A serving engineer's read of DSpark (arXiv:2607.05147) — how semi-autoregressive drafting reduces suffix decay, and why confidence-scheduled verification makes draft length a scheduling decision instead of a fixed hyperparameter."
 tags = ["llm-inference", "llm-serving", "paper-review"]
 +++
