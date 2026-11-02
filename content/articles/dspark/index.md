@@ -102,11 +102,11 @@ This is because the target only accepts a prefix, what the scheduler really need
 
 The scheduler looks at every request in the batch at once. It sorts all candidate draft tokens by prefix survival, then process jthem one by one, from the most likely to be accepted to the least. Each admitted token adds expected accepted tokens, but it also makes the target's step bigger and slower. The step time comes from a table that is profiled once when the engine starts, and the scheduler stops at the batch size where the expected tokens per second is the highest. As a result, at light load extra tokens are almost free, so it verifies long prefixes. At heavy load every extra token slows the whole batch, so only confident tokens make it. This is because survival is non-increasing along each block, sorting by survival keeps each request's verified tokens as a prefix automatically.
 
-In production, the paper makes two practical changes (Sec. 5.2). First, the real step time does not grow smoothly with batch size but jumps in steps, so the scheduler searches the whole table instead of stopping at the first drop. Second, the serving engine needs to know the next batch size before the current step finishes, so the scheduler uses confidences from two steps earlier to decide how many tokens fit, while still ranking the current tokens by their latest scores. The paper shows that this design stays lossless.
+In production, the paper makes two changes. First, the real step time does not grow smoothly with batch size but jumps in steps, so the scheduler searches the whole table instead of stopping at the first drop. Second, the serving engine needs to know the next batch size before the current step finishes, so the scheduler uses confidences from two steps earlier to decide how many tokens fit, while still ranking the current tokens by their latest scores.
 
 ## 5. Results
 
-*All results in this section are reported by the DSpark authors in the paper; I have not reproduced them. Section and table numbers in parentheses refer to the paper.*
+*All results in this section are reported by the DSpark's paper. I have not reproduced them.*
 
 ### 5.1 Experimental Setup
 
