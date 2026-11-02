@@ -183,8 +183,6 @@ One limitation noted in the paper is that the scheduler only saves work on the t
 
 From my reading, a few practical caveats are also worth keeping in mind.
 
-- **Hard to reproduce:** the live serving numbers come from DeepSeek's internal engine and traffic against MTP-1, so they cannot be verified outside DeepSeek or compared directly with other serving stacks.
-- **Offline tables measure acceptance, not speed:** Table 1 runs with the confidence scheduler turned off, so it isolates draft quality rather than end-to-end latency or throughput.
 - **Integration cost:** adopting the full scheduler requires profiling a step-time table per hardware setup and supporting variable verification lengths per request inside the attention kernels.
 
 ## 6. Demo
