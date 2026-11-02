@@ -234,10 +234,6 @@ curl http://localhost:8000/v1/chat/completions \
   }'
 ```
 
-<!-- Drop your RTX 6000 demo screenshot here, for example:
-{{< figure src="demo-vllm-rtx6000.png" link="demo-vllm-rtx6000.png" alt="vLLM serving Qwen3-8B with DSpark on an RTX 6000." caption="Qwen3-8B with DSpark running on a single RTX 6000 in vLLM." >}}
--->
-
 ## 7. Takeaways
 
 +- **Drafting and verification solve different problems.** A deep parallel backbone with a tiny Markov head makes it cheap to draft long, coherent blocks, while a separate scheduler decides how many of those tokens are worth sending to the target model.
