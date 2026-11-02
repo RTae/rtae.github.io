@@ -100,11 +100,11 @@ Each score c_k only covers one position, while the target model accepts draft to
 
 {{< figure src="prefix-scheduler.png" link="prefix-scheduler.png" alt="Step 1: three requests (code, math, chat) with five draft tokens each and decreasing prefix survival. Step 2: pooling and sorting all candidate tokens against profiled step time shows expected tok/s peaking at 9 tokens under heavy load and 13 tokens under light load. Step 3: the resulting kept prefixes under light load (13 of 15) and heavy load (9 of 15)." caption="Hardware-aware prefix scheduler: (1) per-request prefix survival, (2) global ranking and step-time cutoff, and (3) selected prefixes under light vs. heavy load" >}}
 
-With the survival scores ready, the scheduler has to decide how many draft tokens to send to the target model across the whole batch. Sending another draft token can produce more accepted output, but it also makes the target model's batch larger and slower to run. To find the best balance, the scheduler pools all draft tokens from every request, ranks them from highest to lowest survival, and adds them one by one. A later token in a request never has a higher survival score than an earlier one, so this ranking always takes tokens from the start of each request's draft. For each batch size, the scheduler looks up the step time from a table profiled at startup and picks the point that gives the most expected accepted tokens per second. In the figure above, light load barely slows down as tokens are added, so the scheduler verifies 13 of the 15 draft tokens. Under heavy load, every extra token slows the whole batch, so only the 9 highest-survival tokens make the cut.
+With the survival scores ready, the scheduler decides how many draft tokens to send to the target model across the whole batch. Each extra draft token can add accepted output, but it also makes the target model's batch larger and slower to run. To balance the two, the scheduler pools the draft tokens from every request, ranks them from highest to lowest survival, and adds them one at a time. A later token in a request never has a higher survival score than an earlier one, so the ranking always picks tokens from the start of each request's draft. For each possible batch size, the scheduler looks up the step time in a table profiled at startup and picks the size that gives the most expected accepted tokens per second. In the figure, extra tokens barely slow the step under light load, so the scheduler verifies 13 of the 15 draft tokens. Under heavy load, every extra token slows the whole batch, so only the 9 tokens with the highest survival make the cut.
 
 {{< figure src="scheduler-production.png" link="scheduler-production.png" alt="Left: GPU step time rises in flat plateaus and sharp jumps at tile boundaries, creating a local dip in expected tok/s before the true global peak. Right: while Step t-1 runs on the GPU, the CPU uses Step t-2 confidences to lock the batch size budget B* early, then fills those B* slots with the latest Step t scores." caption="Two production adjustments: searching the full step-time table past tile-boundary dips, and using two-step lookback to size the batch without stalling the GPU pipeline" >}}
 
-Running this in a production serving engine takes two small adjustments, shown in the figure above. On the left, GPU step time does not rise smoothly as the batch grows. It stays flat across a plateau and then spikes up when a hardware tile fills, which creates local dips in expected tokens per second. Instead of stopping at the first dip, the scheduler checks the whole step-time table to find the true peak. On the right, the engine prepares the next batch while the GPU is still running the current one, so it cannot wait for the newest confidence scores to pick the batch size. DSpark gets around this by using scores from two steps earlier to lock in how many tokens fit in the batch, then filling those slots with the latest scores once they arrive.
+Running this in a production serving engine takes two small adjustments, shown in the figure above. The first, on the left, deals with the shape of the step-time curve. GPU step time does not rise smoothly as the batch grows. It stays flat for a while and then jumps when a hardware tile fills up, which creates small dips in expected tokens per second. Instead of stopping at the first dip, the scheduler checks the whole step-time table to find the true peak. The second, on the right, deals with timing. The engine prepares the next batch while the GPU is still running the current one, so it cannot wait for the newest confidence scores to choose the batch size. DSpark uses the scores from two steps earlier to decide how many tokens fit in the batch, then fills those slots with the latest scores once they arrive.
 
 ## 5. Results
 
@@ -186,34 +186,32 @@ One limitation noted in the paper is that the scheduler only saves work on the t
 From my perspective, a few more trade-offs are worth keeping in mind.
 
 - **Offline tables measure draft quality, not speed:** Table 1 runs with the confidence scheduler turned off and a fixed block size of 7. That is a clean way to compare drafters, but real end-to-end speedup still depends on drafter overhead, batch size, and target step time.
-- **Using scores from two steps ago can lag sudden changes:** Picking the batch size from two steps earlier works well when acceptance stays steady from round to round. If a request suddenly switches from predictable code to open-ended writing, the batch budget takes two rounds to catch up.
+- **Using scores from two steps ago can lag sudden changes:** In the paper's design, the batch size is picked from scores two steps earlier. That works well when acceptance stays steady from round to round, but if a request suddenly switches from predictable code to open-ended writing, the number of tokens the scheduler verifies takes two rounds to catch up.
 
 ## 6. Demo
 
-You only need **one GPU** to test both halves of DSpark in [vLLM](https://docs.vllm.ai/en/stable/features/speculative_decoding/adaptive_verification/). While DeepSeek-V4 itself is a multi-node MoE model, DeepSeek released single-GPU DSpark checkpoints on [Hugging Face](https://huggingface.co/collections/deepseek-ai/deepspec) for `Qwen3-4B`, `Qwen3-8B`, `Qwen3-14B`, and `Gemma4-12B` that include both the Markov head and the trained confidence head.
+[vLLM](https://docs.vllm.ai/en/stable/features/speculative_decoding/adaptive_verification/) already supports both parts of DSpark. Setting `"method": "dspark"` runs the semi-autoregressive drafter from Section 4.1, and setting `"enable_adaptive_verification": true` adds the confidence-scheduled verification from Section 4.2. With adaptive verification on, vLLM scores each draft token with the checkpoint's confidence head and uses a step-time table profiled at startup to decide how many tokens each request should verify.
 
-On a single **48 GB RTX 6000**, `Qwen/Qwen3-8B` (~16 GB in `bf16`) plus its 7-token DSpark drafter (`deepseek-ai/dspark_qwen3_8b_block7`, ~2 GB) leaves over 25 GB of VRAM for the KV cache, which is enough to run 64+ concurrent requests on one card (or use `Qwen/Qwen3-4B` + `deepseek-ai/dspark_qwen3_4b_block7` on a 24 GB GPU).
+One GPU is enough for the demo. The DeepSeek-V4 DSpark checkpoints are 284B and 1.6T parameter MoE models that need datacenter GPUs, but DeepSeek also released DSpark drafters on [Hugging Face](https://huggingface.co/collections/deepseek-ai/deepspec) for Qwen3-4B, Qwen3-8B, Qwen3-14B, and Gemma4-12B, each with a Markov head and a confidence head. On a 48 GB RTX 6000, Qwen3-8B takes about 16 GB in bf16 and its drafter about 2 GB, which leaves roughly 20 GB for the KV cache. That is enough to serve 64 requests at once. At that load, each verification step carries hundreds of tokens, so the GPU runs out of spare compute and the scheduler starts to matter. On a 24 GB GPU, use Qwen3-4B with `deepseek-ai/dspark_qwen3_4b_block7` instead.
 
 ### Step 1. Pull the vLLM image
-
-vLLM supports both `"method": "dspark"` and confidence-scheduled verification (`"enable_adaptive_verification": true`).
 
 ```bash
 docker pull vllm/vllm-openai:latest
 ```
 
-### Step 2. Launch vLLM with DSpark and adaptive verification
+### Step 2. Launch vLLM with DSpark
 
-Pass `--speculative-config` with `"method": "dspark"` and `"enable_adaptive_verification": true`. At startup, vLLM profiles step times from captured CUDA graphs and uses the checkpoint's confidence head to trim low-survival draft tokens as batch load grows. The released Qwen3 drafters were trained with thinking mode turned off, so disable thinking in the chat template to match.
+Point `--speculative-config` at the DSpark drafter that matches your target model. The released Qwen3 drafters were trained with thinking mode turned off, so the server turns it off too. Prefix caching is disabled so that repeated benchmark runs do not reuse cached prompts and inflate the results.
 
 ```bash
-docker run --rm --gpus all --ipc=host -p 8000:8000 \
+docker run --rm --name dspark --gpus all --ipc=host -p 8000:8000 \
   -v ~/.cache/huggingface:/root/.cache/huggingface \
   vllm/vllm-openai:latest \
   --model Qwen/Qwen3-8B \
-  --served-model-name qwen3-dspark \
   --max-model-len 16384 \
   --gpu-memory-utilization 0.85 \
+  --no-enable-prefix-caching \
   --default-chat-template-kwargs '{"enable_thinking": false}' \
   --speculative-config '{
     "method": "dspark",
@@ -223,27 +221,33 @@ docker run --rm --gpus all --ipc=host -p 8000:8000 \
   }'
 ```
 
-### Step 3. Compare low vs. high concurrency on one GPU
+### Step 3. Benchmark light and heavy load
 
-To see why adaptive verification matters on a single RTX 6000, benchmark three setups with `vllm bench serve` at `--max-concurrency 1` (light load) and `--max-concurrency 64` (heavy load):
+Run the same two benchmarks against three versions of the server. Between versions, stop the server with `docker stop dspark` and launch it again with the change below.
 
-1. **No speculation:** launch without `--speculative-config`.
-2. **Fixed DSpark:** set `"enable_adaptive_verification": false` so vLLM verifies all 7 draft tokens on every request.
-3. **Adaptive DSpark:** set `"enable_adaptive_verification": true` so vLLM verifies long prefixes at concurrency 1 and trims low-confidence tails at concurrency 64.
+1. **No speculation:** remove the `--speculative-config` flag.
+2. **DSpark with a fixed block:** set `"enable_adaptive_verification": false`, so every request verifies all 7 draft tokens.
+3. **DSpark with adaptive verification:** use the command from Step 2.
+
+From a second terminal, run the benchmarks inside the running container. The light-load run sends one request at a time, and the heavy-load run keeps 64 requests in flight on the same GPU. The chat backend lets the server apply the chat template, so thinking stays off during the benchmark.
 
 ```bash
-# Light load (1 request at a time)
-vllm bench serve --model qwen3-dspark --dataset-name sharegpt --num-prompts 100 --max-concurrency 1
+# Light load: one request at a time
+docker exec dspark vllm bench serve \
+  --backend openai-chat --endpoint /v1/chat/completions \
+  --model Qwen/Qwen3-8B --skip-chat-template \
+  --dataset-name hf --dataset-path philschmid/mt-bench \
+  --num-prompts 80 --max-concurrency 1
 
-# Heavy load (64 concurrent requests on the same RTX 6000)
-vllm bench serve --model qwen3-dspark --dataset-name sharegpt --num-prompts 200 --max-concurrency 64
+# Heavy load: 64 requests at a time
+docker exec dspark vllm bench serve \
+  --backend openai-chat --endpoint /v1/chat/completions \
+  --model Qwen/Qwen3-8B --skip-chat-template \
+  --dataset-name hf --dataset-path philschmid/mt-bench \
+  --num-prompts 320 --max-concurrency 64
 ```
 
-<!-- Drop your RTX 6000 demo screenshot here, for example:
-{{< figure src="demo-vllm-rtx6000.png" link="demo-vllm-rtx6000.png" alt="vLLM serving Qwen3-8B with DSpark and adaptive verification on an RTX 6000." caption="Comparing baseline, fixed DSpark, and adaptive DSpark on a single RTX 6000 in vLLM." >}}
--->
-
-Note that open-source vLLM currently runs DSpark's semi-autoregressive drafter from Section 4.1 with a fixed block size, while the load-aware prefix scheduler from Section 4.2.2 is part of DeepSeek's internal engine.
+Compare the output token throughput, which measures total system speed, and the mean TPOT, which measures how fast each user sees new tokens. At light load, both DSpark versions should run well ahead of the baseline, since the GPU has spare compute and extra draft tokens are almost free. At heavy load, the fixed-block version still verifies all 7 draft tokens for every request, so its lead shrinks. Adaptive verification trims the low-survival tokens as the batch fills up, so it should keep more of its speedup. To see how acceptance changes across domains, swap MT-Bench for `openai/gsm8k` or `openai/openai_humaneval`.
 
 ## 7. Takeaways
 
