@@ -15,7 +15,7 @@ DSpark combines a parallel drafting backbone with a tiny sequential Markov head 
 
 ## 1. Why decoding is the bottleneck
 
-{{< figure src="decode-bottleneck.png" link="decode-bottleneck.png" alt="Top: in prefill, model weights are read once from HBM and shared across all prompt tokens in one compute-bound pass. Bottom: in decode, every step re-reads the weights and the growing KV cache to produce a single token, leaving compute waiting on memory." caption="Prefill reuses one weight read across the whole prompt, while decode re-reads weights and the KV cache for each new token (illustrative, not to scale)." >}}
+{{< figure src="decode-bottleneck.png" link="decode-bottleneck.png" alt="Top: in prefill, model weights are read once from HBM and shared across all prompt tokens in one compute-bound pass. Bottom: in decode, every step re-reads the weights and the growing KV cache to produce a single token, leaving compute waiting on memory." caption="Prefill reuses one weight read across the whole prompt, while decode re-reads weights and the KV cache for each new token" >}}
 
 LLM inference has two phases, prefill and decode. In prefill (top of the figure), the model processes the whole prompt in one forward pass, building the KV cache and producing the first output token. Every prompt token is processed in parallel, so each weight read from memory is reused across many tokens. For sufficiently large prompts, prefill is generally compute-bound. It spends most of its time computing rather than waiting for data.
 
@@ -31,7 +31,7 @@ The speedup depends on two things. First, how cheap the draft is. Second, how ma
 
 ### 2.1 Autoregressive drafter
 
-{{< figure src="drafter-ar.png" link="drafter-ar.png" alt="An autoregressive drafter runs four sequential passes (fox, jumps, over, a), and the target verifies all four in one pass, keeping fox, jumps, over and replacing the rejected a with the." caption="Autoregressive drafter: four sequential draft passes followed by one target verification pass (green = accepted draft, blue = target token)." >}}
+{{< figure src="drafter-ar.png" link="drafter-ar.png" alt="An autoregressive drafter runs four sequential passes (fox, jumps, over, a), and the target verifies all four in one pass, keeping fox, jumps, over and replacing the rejected a with the." caption="Autoregressive drafter: four sequential draft passes followed by one target verification pass (green = accepted draft, blue = target token)" >}}
 
 The drafter generates the k tokens one at a time, each conditioned on the previous one. Drafts are high quality because every token sees the tokens before it, but drafting cost grows linearly with k, so draft lengths stay short. Popular methods include EAGLE-3 and MTP, often paired with tree-based verification to make up for the short drafts.
 
@@ -45,13 +45,13 @@ The drafter predicts all k tokens in a single forward pass. Drafting cost stays 
 
 ### 3.1 Autoregressive drafters
 
-{{< figure src="prior-ar.png" link="prior-ar.png" alt="Left: drafter passes grow linearly with block length k for an autoregressive drafter while staying at 1 for a parallel drafter. Right: first-position acceptance is 0.81 vs. 0.88 on math and 0.53 vs. 0.72 on chat for EAGLE-3 vs. DFlash." caption="Left: drafter passes per block. Right: acceptance at position 1, EAGLE-3 vs. DFlash (paper, Sec. 4.3.1)." >}}
+{{< figure src="prior-ar.png" link="prior-ar.png" alt="Left: drafter passes grow linearly with block length k for an autoregressive drafter while staying at 1 for a parallel drafter. Right: first-position acceptance is 0.81 vs. 0.88 on math and 0.53 vs. 0.72 on chat for EAGLE-3 vs. DFlash." caption="Left: drafter passes per block. Right: acceptance at position 1, EAGLE-3 vs. DFlash" >}}
 
 Each draft token needs its own drafter forward pass (left panel), so drafting latency grows linearly with the block length. To keep that latency low, these drafters use short blocks and shallow networks, then use tree-based verification to compensate for the short blocks by verifying several candidate paths at once. This sends more tokens to the target model and can reduce aggregate serving throughput under concurrency. A shallow network is also less accurate, and this matters most at the first draft position. The target only accepts a prefix, so if the first draft token is wrong, the whole block is thrown away. As shown on the right, EAGLE-3 is accepted less often at the first position than DFlash, a parallel drafter that can afford a much deeper network (0.81 vs. 0.88 on math, and 0.53 vs. 0.72 on chat).
 
 ### 3.2 Parallel drafters
 
-{{< figure src="prior-parallel.png" link="prior-parallel.png" alt="Left: a parallel drafter picks each position independently and can mix of course and no problem into of problem or no course. Right: conditional acceptance on chat falls from 0.72 to 0.63 for DFlash while rising from 0.53 to 0.74 for EAGLE-3." caption="Left: independent position picks can collide. Right: conditional acceptance on chat (paper, Sec. 4.3.1)." >}}
+{{< figure src="prior-parallel.png" link="prior-parallel.png" alt="Left: a parallel drafter picks each position independently and can mix of course and no problem into of problem or no course. Right: conditional acceptance on chat falls from 0.72 to 0.63 for DFlash while rising from 0.53 to 0.74 for EAGLE-3." caption="Left: independent position picks can collide. Right: conditional acceptance on chat" >}}
 
 A parallel drafter predicts every position in the block in one forward pass, so no position can see which token was actually sampled before it. Instead, each position must account for all the tokens that might come before it. As a result, when the context allows several continuations, different positions can lock onto different ones. For example, as shown on the left of the figure, if both "of course" and "no problem" fit, a parallel drafter may propose "of problem" or "no course". The paper calls this issue a *multi-modal collision*, and it causes *suffix decay*. Conditional acceptance tends to fall at later positions, even when every earlier token in the block was accepted. Therefore, for a pure parallel drafter, each extra position in a longer block tends to be worth less than the one before.
 
@@ -76,7 +76,7 @@ DSpark addresses the problems from Section 3 with two parts. The first is *semi-
 
 ### 4.1 Semi-autoregressive generation
 
-{{< figure src="semi-ar.png" link="semi-ar.png" alt="An anchor token and mask tokens pass through one parallel backbone to produce base guesses, then a tiny rank-256 Markov head runs left to right so sampling of at position 1 boosts course at position 2." caption="One heavy parallel pass produces base guesses for the whole block, and a tiny Markov head refines them left to right (paper, Sec. 3.1)." >}}
+{{< figure src="semi-ar.png" link="semi-ar.png" alt="An anchor token and mask tokens pass through one parallel backbone to produce base guesses, then a tiny rank-256 Markov head runs left to right so sampling of at position 1 boosts course at position 2." caption="One heavy parallel pass produces base guesses for the whole block, and a tiny Markov head refines them left to right" >}}
 
 DSpark splits drafting into two stages, as shown in the figure. In the *parallel stage*, a heavy backbone (DFlash in the paper) runs one forward pass over the whole block and gives a base guess for every position. This is where most of the drafting work happens, so drafting time still stays roughly constant as the block grows. Then, in the *sequential stage*, a tiny *Markov head* walks through the block from left to right. At each position, it adds a bias to the base guess that depends on the token just sampled, then samples the next token. For example, if both "of course" and "no problem" fit, the backbone alone guesses "of / no" and "course / problem". Once position 1 samples "of", the Markov head boosts "course" and suppresses "problem" at position 2, so the pair stays coherent. In short, this acts like a parallel drafter for speed and uses a small sequential head to keep adjacent words coherent without sacrificing that speed.
 
@@ -84,13 +84,13 @@ The Markov head has to be tiny because it runs once per position, one after anot
 
 ### 4.2 Confidence-scheduled verification
 
-{{< figure src="verify-round.png" link="verify-round.png" alt="After context The quick brown fox, DSpark drafts jumps, over, a, and lazy with confidences 0.95, 0.90, 0.60, and 0.20. The scheduler drops lazy, and the target verifies the first three tokens in one pass." caption="One decoding round: the scheduler drops the low-confidence tail token before the target pass (paper, Fig. 1)." >}}
+{{< figure src="verify-round.png" link="verify-round.png" alt="After context The quick brown fox, DSpark drafts jumps, over, a, and lazy with confidences 0.95, 0.90, 0.60, and 0.20. The scheduler drops lazy, and the target verifies the first three tokens in one pass." caption="One decoding round: the scheduler drops the low-confidence tail token before the target pass" >}}
 
 Even with better drafts, verifying every drafted token is wasteful because the last few tokens of a block are often rejected. DSpark adds two pieces to decide how much of each block to verify. A *confidence head* gives each draft token a confidence score, and a *hardware-aware prefix scheduler* uses those scores together with the current GPU load to choose how many tokens from each request to send to the target. In the figure, the scheduler keeps "jumps over a" and drops "lazy", so the target verifies only three tokens. The target then works like normal speculative decoding. It accepts "jumps over", rejects "a", and adds its own token "the". The paper shows that this scheduling keeps the output distribution exactly the same as the target model's.
 
 #### 4.2.1 Confidence Head
 
-{{< figure src="confidence-head.png" link="confidence-head.png" alt="Step 1: backbone state h_k and previous token embedding pass through a linear layer and sigmoid to produce raw c_k. Step 2: Sequential Temperature Scaling (STS) divides logits by position-specific temperatures T_k to align overconfident raw scores with true acceptance. Step 3: calibrated c_k values (0.95, 0.90, 0.70, 0.50) multiply into falling prefix survival bars (0.95, 0.85, 0.60, 0.30)." caption="From per-token confidence to prefix survival: (1) computing raw c_k, (2) calibrating with STS, and (3) multiplying into prefix survival a_k (illustrative values; calibration error from Sec. 4.3.3)." >}}
+{{< figure src="confidence-head.png" link="confidence-head.png" alt="Step 1: backbone state h_k and previous token embedding pass through a linear layer and sigmoid to produce raw c_k. Step 2: Sequential Temperature Scaling (STS) divides logits by position-specific temperatures T_k to align overconfident raw scores with true acceptance. Step 3: calibrated c_k values (0.95, 0.90, 0.70, 0.50) multiply into falling prefix survival bars (0.95, 0.85, 0.60, 0.30)." caption="From per-token confidence to prefix survival: (1) computing raw c_k, (2) calibrating with STS, and (3) multiplying into prefix survival a_k " >}}
 
 As shown in Step 1 of the figure, the confidence head is a small linear layer with a sigmoid on top. For each draft position k, it looks at the backbone's hidden state and the embedding of the previous draft token, and outputs a score c_k. This is the chance that token k is accepted, given that every token before it was accepted. During training, it learns to match the real acceptance rate, which the paper computes from how far the draft distribution is from the target's.
 
@@ -98,7 +98,7 @@ Each score c_k only covers one position, while the target model accepts draft to
 
 #### 4.2.2 Hardware-Aware Prefix Scheduler
 
-{{< figure src="prefix-scheduler.png" link="prefix-scheduler.png" alt="Step 1: three requests (code, math, chat) with five draft tokens each and decreasing prefix survival. Step 2: pooling and sorting all candidate tokens against profiled step time shows expected tok/s peaking at 9 tokens under heavy load and 13 tokens under light load. Step 3: the resulting kept prefixes under light load (13 of 15) and heavy load (9 of 15)." caption="Hardware-aware prefix scheduler: (1) per-request prefix survival, (2) global ranking and step-time cutoff, and (3) selected prefixes under light vs. heavy load (illustrative)." >}}
+{{< figure src="prefix-scheduler.png" link="prefix-scheduler.png" alt="Step 1: three requests (code, math, chat) with five draft tokens each and decreasing prefix survival. Step 2: pooling and sorting all candidate tokens against profiled step time shows expected tok/s peaking at 9 tokens under heavy load and 13 tokens under light load. Step 3: the resulting kept prefixes under light load (13 of 15) and heavy load (9 of 15)." caption="Hardware-aware prefix scheduler: (1) per-request prefix survival, (2) global ranking and step-time cutoff, and (3) selected prefixes under light vs. heavy load" >}}
 
 With the survival scores ready, the scheduler has to decide how many draft tokens to send to the target model across the whole batch (Step 1 in the figure). Sending another draft token can produce more accepted output, but it also makes the target model's batch larger and slower to run. To find the best balance, the scheduler pools all draft tokens from every request, ranks them by their survival score from highest to lowest, and adds them one by one (Step 2). A later token in a request never has a higher survival score than an earlier one, so this ranking always takes tokens from the start of each request's draft. For each batch size, the scheduler looks up the step time from a table profiled at startup and picks the point that yields the most expected accepted tokens per second. As shown in Step 3, when load is light (left), extra tokens barely slow the step down, so the scheduler verifies 13 of the 15 draft tokens. When load is heavy (right), every extra token slows the whole batch, so only the 9 highest-survival tokens make the cut.
 
@@ -149,21 +149,21 @@ Two patterns in the table stand out. First, acceptance varies sharply by task. O
 
 ### 5.3 Experimental Analysis
 
-#### 1. Position-wise acceptance confirms the design (Sec. 4.3.1)
+#### 1. Position-wise acceptance confirms the design
 
 Tracking acceptance at each draft position backs up the behavior in Sections 3.1 and 3.2. DSpark keeps the deep parallel backbone's strong first token (0.93 acceptance on math at position 1), and the Markov head keeps acceptance high and steady across the remaining positions instead of decaying.
 
-#### 2. A little autoregression goes a long way (Sec. 4.3.2, Qwen3-4B)
+#### 2. A little autoregression goes a long way
 
 - **Depth:** with a 7-token block, DSpark improves with each added layer from 1 to 5. The biggest jump happens between 1 and 2 layers, and a 2-layer DSpark already beats the 5-layer DFlash in every domain.
 - **Block length:** DSpark beats DFlash at every block length tested, and the gap widens as blocks get longer. At 7 draft tokens, DSpark accepts 16% more on math, 15% more on code, and 18% more on chat. At 15 draft tokens, those gains grow to 30%, 26%, and 22%. Replacing the Markov head with an RNN head adds only small extra gains on longer blocks.
 - **Cost:** at batch size 128, growing the draft from 4 to 16 tokens adds just 0.2% to 1.3% to total round latency over DFlash while increasing accepted length by up to 30%.
 
-#### 3. Verify smarter, not longer: the role of confidence scheduling (Sec. 4.3.3, Qwen3-4B)
+#### 3. Verify smarter, not longer: the role of confidence scheduling
 
 Before adding the full scheduler, the paper tests the confidence head on its own by dropping draft tokens below a fixed confidence cutoff. Raising that cutoff filters out tokens that would mostly be rejected anyway, pushing the acceptance rate of the kept tokens from 45.7% to 95.7% on chat, from 76.9% to 92.5% on math, and from 67.6% to 92.0% on code. Chat benefits the most because its later draft tokens miss more often. Still, a high acceptance rate on kept tokens does not guarantee a wall-clock speedup, since cutting too many tokens shrinks each round. A fixed cutoff also ignores GPU load, which is why production serving pairs the calibrated confidence head with the hardware-aware scheduler.
 
-#### 4. Production results (Sec. 5, DeepSeek-V4-Flash and V4-Pro previews, DSpark with up to 5 draft tokens against the previous MTP-1 setup)
+#### 4. Production results
 
 - **Scalability:** the production drafter uses three MoE layers with a sliding window attention of 128 plus the Markov head. To keep training fast on long contexts, workers send hidden states instead of full-vocabulary logits and pack short training blocks around sampled anchor positions.
 - **Hardware-aware prefix scheduler:** the two production tweaks from Section 4.2.2 let the scheduler run alongside zero-overhead scheduling and CUDA graphs without changing the output distribution.
