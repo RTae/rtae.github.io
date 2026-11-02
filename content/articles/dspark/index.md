@@ -100,9 +100,9 @@ Each score c_k only covers one position, while the target model accepts draft to
 
 {{< figure src="prefix-scheduler.png" link="prefix-scheduler.png" alt="The same three requests, code, math and chat, each with five draft tokens and their prefix survival values. At light load the scheduler verifies 13 of the 15 tokens; at heavy load it verifies only 9, keeping the most confident ones. Below, the three steps the scheduler follows to choose the cut-off." caption="Illustrative survival values; production numbers from the paper (Sec. 5.4)." >}}
 
-The scheduler looks at every request in the batch at once. It sorts all candidate draft tokens by prefix survival, then process jthem one by one, from the most likely to be accepted to the least. Each admitted token adds expected accepted tokens, but it also makes the target's step bigger and slower. The step time comes from a table that is profiled once when the engine starts, and the scheduler stops at the batch size where the expected tokens per second is the highest. As a result, at light load extra tokens are almost free, so it verifies long prefixes. At heavy load every extra token slows the whole batch, so only confident tokens make it. This is because survival is non-increasing along each block, sorting by survival keeps each request's verified tokens as a prefix automatically.
+Once every draft token has a calibrated prefix survival score, the scheduler pools all candidate tokens across the batch and sorts them from highest to lowest survival. It then admits tokens one by one and add token increases the expected number of accepted tokens, but it also increases the batch size and slows the target model's step. Using a step-time table profiled once at engine startup, the scheduler picks the cutoff that maximizes expected accepted tokens per second. Under light load, extra tokens cost almost nothing, so the scheduler verifies long prefixes. Under heavy load, every extra token slows the whole batch, so only the most confident tokens are kept. Since survival never increases within a block, global sorting automatically selects a contiguous prefix for each request.
 
-In production, the paper makes two changes. First, the real step time does not grow smoothly with batch size but jumps in steps, so the scheduler searches the whole table instead of stopping at the first drop. Second, the serving engine needs to know the next batch size before the current step finishes, so the scheduler uses confidences from two steps earlier to decide how many tokens fit, while still ranking the current tokens by their latest scores.
+Production serving requires two practical adjustments. First, real GPU step times increase in discrete jumps rather than a smooth curve, so the scheduler checks the entire step-time table instead of stopping at the first dip in throughput. Second, the engine must fix the next batch size before the current step finishes. To avoid stalling the pipeline, the scheduler estimates the token budget using confidence scores from two steps earlier, while still ranking the current step's tokens with their latest scores.
 
 ## 5. Results
 
@@ -187,7 +187,9 @@ From my reading, there are a few more things to keep in mind.
 - **Offline results measure acceptance, not speed:** the main table reports accepted length with the scheduler turned off, so it shows draft quality rather than end-to-end speedup.
 - **Integration cost:** the scheduler needs a step-time table profiled for each engine and kernels that can verify a different number of tokens per request, which is real work for any engine that wants to adopt it.
 
-## 6. Takeaways
+## 6. Demo
+
+## 7. Takeaways
 
 - **Draft architecture and verification policy are separate problems.** DSpark uses a heavy parallel backbone for cheap long drafts and a tiny Markov head for coherence, then independently decides how much of each draft deserves target compute.
 - **Optimize system throughput under a latency target, not acceptance alone.** Higher acceptance or accepted length does not guarantee faster serving; verification cost and batch load determine the benefit.
