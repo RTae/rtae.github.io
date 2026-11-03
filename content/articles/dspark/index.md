@@ -11,6 +11,8 @@ Speculative decoding has a production problem. Verifying a few extra draft token
 
 ## TLDR
 
+{{< figure src="dspark-overview.gif" link="dspark-overview.gif" alt="Animation of one DSpark decoding round. After the context The quick brown fox, one parallel backbone pass guesses all four draft positions, and a tiny Markov head fixes jumps, over, a, and lazy from left to right. The confidence head gives prefix survival scores of 0.95, 0.86, 0.60, and 0.30. Under light GPU load all four tokens are kept, while under heavy load only jumps and over are kept. The target verifies them in one pass, accepts both, and adds its own token the." caption="One DSpark round: a parallel pass and a tiny Markov head draft the block, and the current GPU load decides how many draft tokens the target verifies" >}}
+
 DSpark combines a parallel drafting backbone with a tiny sequential Markov head to reduce suffix decay without paying for a full autoregressive drafter. It then uses calibrated token confidence and profiled GPU step times to choose how many draft tokens each request should verify under the current load. The authors report higher accepted lengths across four target models and substantial production throughput gains over MTP-1, although the production results have not been independently reproduced.
 
 ## 1. Why decoding is the bottleneck
