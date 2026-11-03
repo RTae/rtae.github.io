@@ -173,7 +173,7 @@ Before adding the full scheduler, the paper tests the confidence head on its own
 - **Results from real traffic:** at moderate load (under 200 concurrent requests on V4-Flash and 150 on V4-Pro), the scheduler verifies about 4–6 tokens per request (including the target's own token) compared with MTP-1's fixed 2, and dials that budget down as load rises. DSpark replaced MTP-1 in production two weeks after the DeepSeek-V4 preview launch.
 
 | Engine | Per-user speed target (SLA) | Throughput vs. MTP-1 | Per-user speed at matched throughput |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | V4-Flash | 80 tok/s/user | +51% | 60–85% faster |
 | V4-Flash | 120 tok/s/user | +661% (nominal) | |
 | V4-Pro | 35 tok/s/user | +52% | 57–78% faster |
