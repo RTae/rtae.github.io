@@ -194,15 +194,16 @@ From my perspective, a few more trade-offs are worth keeping in mind.
 
 ### Step 1. Install vLLM
 
-Install vLLM in a fresh Python environment. The `bench` extra adds the packages the benchmark tool needs to load datasets from Hugging Face.
+Install vLLM in a fresh Python environment. The `bench` extra adds the packages the benchmark tool needs to load datasets from Hugging Face. Then run `vllm download-kernels` to install FlashInfer's precompiled kernels. Without them, FlashInfer downloads and compiles its kernels when the server starts, which can take several minutes.
 
 ```bash
 pip install -U "vllm[bench]"
+vllm download-kernels
 ```
 
 ### Step 2. Launch vLLM with DSpark
 
-Point `--speculative-config` at the DSpark drafter that matches your target model. The released Qwen3 drafters were trained with thinking mode turned off, so the server turns it off too. Prefix caching is disabled so that repeated benchmark runs do not reuse cached prompts and inflate the results.
+Point `--speculative-config` at the DSpark drafter that matches your target model. The released Qwen3 drafters were trained with thinking mode turned off, so the server turns it off too. Prefix caching is disabled so that repeated benchmark runs do not reuse cached prompts and inflate the results. Adaptive verification also needs an attention backend whose CUDA graphs can handle a different number of tokens for each request. On GPUs such as the A100, L40S and RTX PRO 6000, vLLM's default FlashAttention 2 backend cannot do this and fails at startup, so the server uses Triton attention instead.
 
 ```bash
 # Terminal 1: start the server
@@ -210,6 +211,7 @@ vllm serve Qwen/Qwen3-8B \
   --max-model-len 16384 \
   --gpu-memory-utilization 0.85 \
   --no-enable-prefix-caching \
+  --attention-backend TRITON_ATTN \
   --default-chat-template-kwargs '{"enable_thinking": false}' \
   --speculative-config '{
     "method": "dspark",
@@ -239,7 +241,7 @@ The reply should look like any normal Qwen3-8B answer. Back in the server log, a
 
 ### Step 3. Benchmark light and heavy load
 
-Run the same two benchmarks against four servers. Start each server in one terminal, run the benchmarks from a second terminal, and stop the server with Ctrl+C before starting the next one. Light load sends one request at a time, and heavy load keeps 64 requests in flight on the same GPU. The chat backend lets the server apply the chat template, so thinking stays off during the benchmark.
+Run the same two benchmarks against four servers. Every server uses Triton attention, so the differences come from speculative decoding alone. Start each server in one terminal, run the benchmarks from a second terminal, and stop the server with Ctrl+C before starting the next one. Light load sends one request at a time, and heavy load keeps 64 requests in flight on the same GPU. The chat backend lets the server apply the chat template, so thinking stays off during the benchmark.
 
 #### 3.1 No speculative decoding
 
@@ -251,6 +253,7 @@ vllm serve Qwen/Qwen3-8B \
   --max-model-len 16384 \
   --gpu-memory-utilization 0.85 \
   --no-enable-prefix-caching \
+  --attention-backend TRITON_ATTN \
   --default-chat-template-kwargs '{"enable_thinking": false}'
 ```
 
@@ -284,6 +287,7 @@ vllm serve Qwen/Qwen3-8B \
   --max-model-len 16384 \
   --gpu-memory-utilization 0.85 \
   --no-enable-prefix-caching \
+  --attention-backend TRITON_ATTN \
   --default-chat-template-kwargs '{"enable_thinking": false}' \
   --speculative-config '{
     "method": "eagle3",
@@ -318,6 +322,7 @@ vllm serve Qwen/Qwen3-8B \
   --max-model-len 16384 \
   --gpu-memory-utilization 0.85 \
   --no-enable-prefix-caching \
+  --attention-backend TRITON_ATTN \
   --default-chat-template-kwargs '{"enable_thinking": false}' \
   --speculative-config '{
     "method": "dspark",
@@ -353,6 +358,7 @@ vllm serve Qwen/Qwen3-8B \
   --max-model-len 16384 \
   --gpu-memory-utilization 0.85 \
   --no-enable-prefix-caching \
+  --attention-backend TRITON_ATTN \
   --default-chat-template-kwargs '{"enable_thinking": false}' \
   --speculative-config '{
     "method": "dspark",
