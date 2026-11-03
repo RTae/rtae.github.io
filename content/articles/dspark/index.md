@@ -192,10 +192,12 @@ From my perspective, a few more trade-offs are worth keeping in mind.
 
 [vLLM](https://docs.vllm.ai/en/stable/features/speculative_decoding/adaptive_verification/) already supports both parts of DSpark. Setting `"method": "dspark"` runs the semi-autoregressive drafter from Section 4.1, and setting `"enable_adaptive_verification": true` adds the confidence-scheduled verification from Section 4.2. With adaptive verification on, vLLM scores each draft token with the checkpoint's confidence head and uses a step-time table profiled at startup to decide how many tokens each request should verify.
 
-### Step 1. Pull the vLLM image
+### Step 1. Install vLLM
+
+Install vLLM in a fresh Python environment. The `bench` extra adds the packages the benchmark tool needs to load datasets from Hugging Face.
 
 ```bash
-docker pull vllm/vllm-openai:latest
+pip install -U "vllm[bench]"
 ```
 
 ### Step 2. Launch vLLM with DSpark
@@ -203,10 +205,8 @@ docker pull vllm/vllm-openai:latest
 Point `--speculative-config` at the DSpark drafter that matches your target model. The released Qwen3 drafters were trained with thinking mode turned off, so the server turns it off too. Prefix caching is disabled so that repeated benchmark runs do not reuse cached prompts and inflate the results.
 
 ```bash
-docker run --rm --name dspark --gpus all --ipc=host -p 8000:8000 \
-  -v ~/.cache/huggingface:/root/.cache/huggingface \
-  vllm/vllm-openai:latest \
-  --model Qwen/Qwen3-8B \
+# Terminal 1: start the server
+vllm serve Qwen/Qwen3-8B \
   --max-model-len 16384 \
   --gpu-memory-utilization 0.85 \
   --no-enable-prefix-caching \
@@ -219,33 +219,166 @@ docker run --rm --name dspark --gpus all --ipc=host -p 8000:8000 \
   }'
 ```
 
-### Step 3. Benchmark light and heavy load
-
-Run the same two benchmarks against three versions of the server. Between versions, stop the server with `docker stop dspark` and launch it again with the change below.
-
-1. **No speculation:** remove the `--speculative-config` flag.
-2. **DSpark with a fixed block:** set `"enable_adaptive_verification": false`, so every request verifies all 7 draft tokens.
-3. **DSpark with adaptive verification:** use the command from Step 2.
-
-From a second terminal, run the benchmarks inside the running container. The light-load run sends one request at a time, and the heavy-load run keeps 64 requests in flight on the same GPU. The chat backend lets the server apply the chat template, so thinking stays off during the benchmark.
+Once the log prints `Application startup complete`, send a test request from a second terminal.
 
 ```bash
-# Light load: one request at a time
-docker exec dspark vllm bench serve \
+# Terminal 2: send a test request
+curl http://localhost:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "Qwen/Qwen3-8B",
+    "messages": [
+      {"role": "user", "content": "Write a Python function for binary search."}
+    ],
+    "max_tokens": 256,
+    "temperature": 0
+  }'
+```
+
+The reply should look like any normal Qwen3-8B answer. Back in the server log, a line starting with `SpecDecoding metrics` reports the mean acceptance length, the average number of tokens each round produces, including the target model's own token.
+
+### Step 3. Benchmark light and heavy load
+
+Run the same two benchmarks against four servers. Start each server in one terminal, run the benchmarks from a second terminal, and stop the server with Ctrl+C before starting the next one. Light load sends one request at a time, and heavy load keeps 64 requests in flight on the same GPU. The chat backend lets the server apply the chat template, so thinking stays off during the benchmark.
+
+#### 3.1 No speculative decoding
+
+This is the baseline, where the target model generates one token per step.
+
+```bash
+# Terminal 1: start the server
+vllm serve Qwen/Qwen3-8B \
+  --max-model-len 16384 \
+  --gpu-memory-utilization 0.85 \
+  --no-enable-prefix-caching \
+  --default-chat-template-kwargs '{"enable_thinking": false}'
+```
+
+```bash
+# Terminal 2: light load, one request at a time
+vllm bench serve \
   --backend openai-chat --endpoint /v1/chat/completions \
   --model Qwen/Qwen3-8B --skip-chat-template \
   --dataset-name hf --dataset-path philschmid/mt-bench \
   --num-prompts 80 --max-concurrency 1
 
-# Heavy load: 64 requests at a time
-docker exec dspark vllm bench serve \
+# Terminal 2: heavy load, 64 requests at a time
+vllm bench serve \
   --backend openai-chat --endpoint /v1/chat/completions \
   --model Qwen/Qwen3-8B --skip-chat-template \
   --dataset-name hf --dataset-path philschmid/mt-bench \
   --num-prompts 320 --max-concurrency 64
 ```
 
-Compare the output token throughput, which measures total system speed, and the mean TPOT, which measures how fast each user sees new tokens. At light load, both DSpark versions should run well ahead of the baseline, since the GPU has spare compute and extra draft tokens are almost free. At heavy load, the fixed-block version still verifies all 7 draft tokens for every request, so its lead shrinks. Adaptive verification trims the low-survival tokens as the batch fills up, so it should keep more of its speedup. To see how acceptance changes across domains, swap MT-Bench for `openai/gsm8k` or `openai/openai_humaneval`.
+#### 3.2 Speculative decoding with a fixed draft length
+
+Both servers below verify a fixed number of draft tokens for every request. The first uses EAGLE-3, a popular autoregressive drafter, and the second uses the DSpark drafter with adaptive verification turned off. Comparing the two shows how much DSpark's drafter helps on its own.
+
+##### 3.2.1 EAGLE-3
+
+EAGLE-3 drafts one token at a time, so each extra draft token costs another drafter pass. Red Hat's EAGLE-3 drafter for Qwen3-8B was trained with thinking turned off and recommends three draft tokens. Its training data differs from DeepSeek's drafters, so this compares the released drafters rather than reproducing the paper's Table 1.
+
+```bash
+# Terminal 1: start the server
+vllm serve Qwen/Qwen3-8B \
+  --max-model-len 16384 \
+  --gpu-memory-utilization 0.85 \
+  --no-enable-prefix-caching \
+  --default-chat-template-kwargs '{"enable_thinking": false}' \
+  --speculative-config '{
+    "method": "eagle3",
+    "model": "RedHatAI/Qwen3-8B-speculator.eagle3",
+    "num_speculative_tokens": 3
+  }'
+```
+
+```bash
+# Terminal 2: light load, one request at a time
+vllm bench serve \
+  --backend openai-chat --endpoint /v1/chat/completions \
+  --model Qwen/Qwen3-8B --skip-chat-template \
+  --dataset-name hf --dataset-path philschmid/mt-bench \
+  --num-prompts 80 --max-concurrency 1
+
+# Terminal 2: heavy load, 64 requests at a time
+vllm bench serve \
+  --backend openai-chat --endpoint /v1/chat/completions \
+  --model Qwen/Qwen3-8B --skip-chat-template \
+  --dataset-name hf --dataset-path philschmid/mt-bench \
+  --num-prompts 320 --max-concurrency 64
+```
+
+##### 3.2.2 DSpark drafter with a fixed draft length
+
+This uses the same DSpark drafter as Step 2 with adaptive verification turned off, so every request verifies all 7 draft tokens, just like standard speculative decoding.
+
+```bash
+# Terminal 1: start the server
+vllm serve Qwen/Qwen3-8B \
+  --max-model-len 16384 \
+  --gpu-memory-utilization 0.85 \
+  --no-enable-prefix-caching \
+  --default-chat-template-kwargs '{"enable_thinking": false}' \
+  --speculative-config '{
+    "method": "dspark",
+    "model": "deepseek-ai/dspark_qwen3_8b_block7",
+    "num_speculative_tokens": 7,
+    "enable_adaptive_verification": false
+  }'
+```
+
+```bash
+# Terminal 2: light load, one request at a time
+vllm bench serve \
+  --backend openai-chat --endpoint /v1/chat/completions \
+  --model Qwen/Qwen3-8B --skip-chat-template \
+  --dataset-name hf --dataset-path philschmid/mt-bench \
+  --num-prompts 80 --max-concurrency 1
+
+# Terminal 2: heavy load, 64 requests at a time
+vllm bench serve \
+  --backend openai-chat --endpoint /v1/chat/completions \
+  --model Qwen/Qwen3-8B --skip-chat-template \
+  --dataset-name hf --dataset-path philschmid/mt-bench \
+  --num-prompts 320 --max-concurrency 64
+```
+
+#### 3.3 DSpark with adaptive verification
+
+This is the same server as Step 2, with both the drafter and adaptive verification turned on.
+
+```bash
+# Terminal 1: start the server
+vllm serve Qwen/Qwen3-8B \
+  --max-model-len 16384 \
+  --gpu-memory-utilization 0.85 \
+  --no-enable-prefix-caching \
+  --default-chat-template-kwargs '{"enable_thinking": false}' \
+  --speculative-config '{
+    "method": "dspark",
+    "model": "deepseek-ai/dspark_qwen3_8b_block7",
+    "num_speculative_tokens": 7,
+    "enable_adaptive_verification": true
+  }'
+```
+
+```bash
+# Terminal 2: light load, one request at a time
+vllm bench serve \
+  --backend openai-chat --endpoint /v1/chat/completions \
+  --model Qwen/Qwen3-8B --skip-chat-template \
+  --dataset-name hf --dataset-path philschmid/mt-bench \
+  --num-prompts 80 --max-concurrency 1
+
+# Terminal 2: heavy load, 64 requests at a time
+vllm bench serve \
+  --backend openai-chat --endpoint /v1/chat/completions \
+  --model Qwen/Qwen3-8B --skip-chat-template \
+  --dataset-name hf --dataset-path philschmid/mt-bench \
+  --num-prompts 320 --max-concurrency 64
+```
+
+Each benchmark prints a summary. Compare the output token throughput, which measures total system speed, and the mean TPOT, which measures how fast each user sees new tokens. At light load, all three speculative versions should run well ahead of the baseline, since the GPU has spare compute and extra draft tokens are almost free. Comparing 3.2.1 with 3.2.2 shows how much DSpark's drafter adds on its own. At heavy load, both fixed-length versions still verify every draft token for every request, so their lead shrinks. Adaptive verification trims the low-survival tokens as the batch fills up, so 3.3 should keep more of its speedup. To see how acceptance changes across domains, change `--dataset-path` to `openai/gsm8k` or `openai/openai_humaneval`.
 
 ## 7. Takeaways
 
