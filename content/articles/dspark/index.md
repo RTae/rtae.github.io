@@ -115,7 +115,7 @@ Running this in a production serving engine takes two small adjustments, shown i
 ### 5.1 Experimental Setup
 
 | Setting | From the paper (Sec. 4.1) |
-|---|---|
+| --- | --- |
 | Target models | Qwen3-4B, Qwen3-8B, Qwen3-14B, Gemma4-12B |
 | Drafters | EAGLE-3 (autoregressive, 1 layer), DFlash (parallel, 5 layers), DSpark (5-layer backbone + Markov head) |
 | Block size | 7 for every drafter |
@@ -129,7 +129,7 @@ All three drafters are trained with the same code and data in DeepSpec. The conf
 ### 5.2 Experimental Results
 
 | Target | Drafter | GSM8K | MATH | AIME25 | MBPP | HumanEval | LCB | MT-Bench | Alpaca | Arena-Hard |
-|---|---|---|---|---|---|---|---|---|---|---|
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Qwen3-4B | EAGLE-3 | 5.14 | 4.62 | 3.92 | 3.69 | 4.16 | 3.77 | 2.39 | 2.26 | 2.55 |
 | | DFlash | 5.40 | 4.85 | 4.15 | 4.40 | 4.74 | 4.18 | 3.07 | 2.96 | 2.83 |
 | | **DSpark** | **6.11** | **5.70** | **4.89** | **5.13** | **5.38** | **4.86** | **3.64** | **3.54** | **3.29** |
