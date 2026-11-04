@@ -200,10 +200,12 @@ First, we need to install vLLM in a Python environment, and in this demo we will
 
 {{< tabs >}}
 {{< tab "GPU machine" >}}
+
 ```bash
 pip install -U "vllm[bench]"
 vllm download-kernels
 ```
+
 {{< /tab >}}
 {{< tab "Modal" >}}
 [Modal](https://modal.com) runs the same install inside a container image, and every run gets its own H100, so first install the Modal client and log in.
@@ -273,6 +275,7 @@ def main(server: str, client: str):
         run.remote(server_file.read(), client_file.read())
 EOF
 ```
+
 {{< /tab >}}
 {{< /tabs >}}
 
@@ -282,6 +285,7 @@ Use `--speculative-config` to configure a DSpark drafter that matches your targe
 
 {{< tabs >}}
 {{< tab "GPU machine" >}}
+
 ```bash
 # Terminal 1: start the server
 vllm serve Qwen/Qwen3-8B \
@@ -313,6 +317,7 @@ curl http://localhost:8000/v1/chat/completions \
     "temperature": 0
   }'
 ```
+
 {{< /tab >}}
 {{< tab "Modal" >}}
 Save the server command and the test request as files, then run both on Modal. The first run takes about ten minutes because it builds the image and downloads both models. Later runs reuse them and start in about three minutes.
@@ -355,6 +360,7 @@ EOF
 # Run both on a Modal H100
 modal run dspark_modal.py --server server.sh --client client.sh
 ```
+
 {{< /tab >}}
 {{< /tabs >}}
 
@@ -396,6 +402,7 @@ This is the baseline, where the target model generates one token per step.
 
 {{< tabs >}}
 {{< tab "GPU machine" >}}
+
 ```bash
 # Terminal 1: start the server
 vllm serve Qwen/Qwen3-8B \
@@ -415,8 +422,10 @@ bash light.sh
 # Terminal 2: heavy load
 bash heavy.sh
 ```
+
 {{< /tab >}}
 {{< tab "Modal" >}}
+
 ```bash
 # Save the server command
 cat > server.sh <<'EOF'
@@ -438,6 +447,7 @@ modal run dspark_modal.py --server server.sh --client light.sh
 # Heavy load on a Modal H100
 modal run dspark_modal.py --server server.sh --client heavy.sh
 ```
+
 {{< /tab >}}
 {{< /tabs >}}
 
@@ -447,6 +457,7 @@ EAGLE-3 drafts one token at a time, so each extra draft token costs another draf
 
 {{< tabs >}}
 {{< tab "GPU machine" >}}
+
 ```bash
 # Terminal 1: start the server
 vllm serve Qwen/Qwen3-8B \
@@ -471,8 +482,10 @@ bash light.sh
 # Terminal 2: heavy load
 bash heavy.sh
 ```
+
 {{< /tab >}}
 {{< tab "Modal" >}}
+
 ```bash
 # Save the server command
 cat > server.sh <<'EOF'
@@ -499,6 +512,7 @@ modal run dspark_modal.py --server server.sh --client light.sh
 # Heavy load on a Modal H100
 modal run dspark_modal.py --server server.sh --client heavy.sh
 ```
+
 {{< /tab >}}
 {{< /tabs >}}
 
@@ -510,6 +524,7 @@ This uses the same DSpark drafter as Step 2 with adaptive verification turned of
 
 {{< tabs >}}
 {{< tab "GPU machine" >}}
+
 ```bash
 # Terminal 1: start the server
 vllm serve Qwen/Qwen3-8B \
@@ -535,8 +550,10 @@ bash light.sh
 # Terminal 2: heavy load
 bash heavy.sh
 ```
+
 {{< /tab >}}
 {{< tab "Modal" >}}
+
 ```bash
 # Save the server command
 cat > server.sh <<'EOF'
@@ -564,6 +581,7 @@ modal run dspark_modal.py --server server.sh --client light.sh
 # Heavy load on a Modal H100
 modal run dspark_modal.py --server server.sh --client heavy.sh
 ```
+
 {{< /tab >}}
 {{< /tabs >}}
 
@@ -573,6 +591,7 @@ This is the same server as Step 2, with both the drafter and adaptive verificati
 
 {{< tabs >}}
 {{< tab "GPU machine" >}}
+
 ```bash
 # Terminal 1: start the server
 vllm serve Qwen/Qwen3-8B \
@@ -598,8 +617,10 @@ bash light.sh
 # Terminal 2: heavy load
 bash heavy.sh
 ```
+
 {{< /tab >}}
 {{< tab "Modal" >}}
+
 ```bash
 # Save the server command
 cat > server.sh <<'EOF'
@@ -627,6 +648,7 @@ modal run dspark_modal.py --server server.sh --client light.sh
 # Heavy load on a Modal H100
 modal run dspark_modal.py --server server.sh --client heavy.sh
 ```
+
 {{< /tab >}}
 {{< /tabs >}}
 
