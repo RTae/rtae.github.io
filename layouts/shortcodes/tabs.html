@@ -1,0 +1,12 @@
+{{- /* Tabbed alternatives for one step, e.g. the same demo on a GPU machine and on Modal.
+
+       {{< tabs >}}
+       {{< tab "GPU machine" >}} Markdown {{< /tab >}}
+       {{< tab "Modal" >}} Markdown {{< /tab >}}
+       {{< /tabs >}}
+
+   CSS-only, styled in custom.css: every tab renders its radio input, label and
+   panel as siblings inside this wrapper (see tab.html). */ -}}
+<div class="tabs">
+{{- .Inner -}}
+</div>

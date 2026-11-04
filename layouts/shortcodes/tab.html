@@ -1,0 +1,9 @@
+{{- /* One tab inside {{< tabs >}}. The parent's ordinal is unique among the page's
+   top-level shortcodes, so it names the radio group; the first tab starts checked. */ -}}
+{{- $group := printf "tabs-%d" .Parent.Ordinal -}}
+{{- $id := printf "%s-%d" $group .Ordinal -}}
+<input type="radio" name="{{ $group }}" id="{{ $id }}"{{ if eq .Ordinal 0 }} checked{{ end }}>
+<label for="{{ $id }}">{{ .Get 0 }}</label>
+<div class="tab-panel">
+{{ .InnerDeindent | .Page.RenderString (dict "display" "block") }}
+</div>

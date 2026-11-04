@@ -227,3 +227,57 @@ dialog.zoom img {
 .post-entry {
     margin-block: 1em;
 }
+
+/* ---------------------------------------------------------------------------
+   Tabs (layouts/shortcodes/tabs.html, tab.html)
+
+   Each tab is a radio input, its label and its panel, all siblings in a
+   wrapping flex row. Labels stay on the first line, each panel takes a full
+   line below them, and only the panel after the checked input is shown.
+--------------------------------------------------------------------------- */
+.tabs {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    margin-block: 1em;
+}
+
+/* Hidden but still focusable, so arrow keys switch tabs. */
+.tabs > input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.tabs > label {
+    order: 0;
+    padding: 0 1ch;
+    cursor: pointer;
+    color: var(--secondary-color);
+    border-bottom: 2px solid transparent;
+}
+
+.tabs > input:checked + label {
+    color: var(--font-color);
+    border-bottom-color: var(--primary-color);
+}
+
+.tabs > input:focus-visible + label {
+    outline: 1px dashed var(--primary-color);
+}
+
+.tabs > .tab-panel {
+    order: 1;
+    flex-basis: 100%;
+    display: none;
+    padding-top: 1em;
+    border-top: 1px dashed var(--secondary-color);
+}
+
+.tabs > input:checked + label + .tab-panel {
+    display: block;
+}
+
+.tab-panel > :first-child {
+    margin-top: 0;
+}
