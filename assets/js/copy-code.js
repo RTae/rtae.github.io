@@ -1,9 +1,25 @@
 // Copy button for article code blocks. Adds a "copy" button to the top-right
 // corner of each block that copies the code to the clipboard. Without
-// JavaScript, or without the async Clipboard API (plain-http pages), no button
-// is added and the code stays selectable as before.
+// JavaScript, no button is added and the code stays selectable as before.
 (() => {
-  if (!navigator.clipboard) return;
+  // The async Clipboard API is missing on plain-http pages and can be refused
+  // by browser policy; the legacy copy command still works inside a click.
+  const copyText = async (text) => {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const area = document.createElement("textarea");
+      area.value = text;
+      area.setAttribute("readonly", "");
+      area.style.position = "fixed";
+      area.style.opacity = "0";
+      document.body.append(area);
+      area.select();
+      const copied = document.execCommand("copy");
+      area.remove();
+      if (!copied) throw new Error("copy command refused");
+    }
+  };
 
   for (const pre of document.querySelectorAll("article pre")) {
     const code = pre.querySelector("code") || pre;
@@ -24,7 +40,7 @@
     button.addEventListener("click", async () => {
       try {
         // Drop the final newline so a pasted command waits for Enter.
-        await navigator.clipboard.writeText(code.textContent.replace(/\n$/, ""));
+        await copyText(code.textContent.replace(/\n$/, ""));
         button.textContent = "copied";
       } catch {
         button.textContent = "failed";
