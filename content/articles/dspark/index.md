@@ -5,7 +5,7 @@ description = "A serving engineer's read of DSpark (arXiv:2607.05147) — how se
 tags = ["llm-inference", "llm-serving", "paper-review"]
 +++
 
-Speculative decoding has a production problem. Verifying a few extra draft tokens may help one request, but under heavy load those tokens can consume GPU capacity that could have served other requests. DSpark solves this by estimating the chance that each draft token will be accepted and checking how busy the GPU is. When the GPU has spare capacity, it verifies more tokens. When the system is busy, it verifies fewer, because extra tokens would slow the whole batch. The goal is to keep total throughput high, rather than using a fixed number for every request.
+In speculative decoding, by verifying a few extra draft tokens may help one request, but under heavy load those tokens can consume GPU capacity that could have served other requests. DSpark solves this by estimating the chance that each draft token will be accepted and checking how busy the GPU is. When the GPU has capacity, it verifies more tokens. If not, it verifies fewer, because extra tokens would slow the whole batch. As a result, this method help to improve total throughput high.
 
 <!--more-->
 
