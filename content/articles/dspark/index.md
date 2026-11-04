@@ -453,9 +453,7 @@ modal run dspark_modal.py --server server.sh --client heavy.sh
 {{< /tab >}}
 {{< /tabs >}}
 
-{{< figure src="demo_bensmark_no_light.png" link="demo_bensmark_no_light.png" alt="vllm bench serve result without speculative decoding at light load: 80 requests at concurrency 1 in 112.90 s, output token throughput 146.48 tok/s, mean TTFT 28.19 ms, and mean TPOT 6.72 ms." caption="Light load without speculative decoding" >}}
-
-{{< figure src="demo_bensmark_no_hevey.png" link="demo_bensmark_no_hevey.png" alt="vllm bench serve result without speculative decoding at heavy load: 320 requests at concurrency 64 in 11.01 s, output token throughput 6118.06 tok/s, mean TTFT 173.49 ms, and mean TPOT 8.80 ms." caption="Heavy load without speculative decoding" >}}
+{{< figure src="demo_benchmark_no.png" link="demo_benchmark_no.png" alt="vllm bench serve results without speculative decoding. Left, light load: 80 requests at concurrency 1 in 112.90 s, output token throughput 146.48 tok/s, mean TTFT 28.19 ms, and mean TPOT 6.72 ms. Right, heavy load: 320 requests at concurrency 64 in 11.01 s, output token throughput 6118.06 tok/s, mean TTFT 173.49 ms, and mean TPOT 8.80 ms." caption="No speculative decoding. Left: light load. Right: heavy load" >}}
 
 #### 3.3 Speculative decoding with EAGLE-3
 
@@ -522,9 +520,7 @@ modal run dspark_modal.py --server server.sh --client heavy.sh
 {{< /tab >}}
 {{< /tabs >}}
 
-{{< figure src="demo_bensmark_eagle3_light.png" link="demo_bensmark_eagle3_light.png" alt="vllm bench serve result with EAGLE-3 at light load: 80 requests at concurrency 1 in 59.92 s, output token throughput 281.09 tok/s, mean TTFT 29.28 ms, mean TPOT 3.38 ms, and an acceptance length of 2.28." caption="Light load with EAGLE-3" >}}
-
-{{< figure src="demo_bensmark_eagle3_hevey.png" link="demo_bensmark_eagle3_hevey.png" alt="vllm bench serve result with EAGLE-3 at heavy load: 320 requests at concurrency 64 in 8.34 s, output token throughput 8062.66 tok/s, mean TTFT 195.31 ms, mean TPOT 6.38 ms, and an acceptance length of 2.28." caption="Heavy load with EAGLE-3" >}}
+{{< figure src="demo_benchmark_eagle3.png" link="demo_benchmark_eagle3.png" alt="vllm bench serve results with EAGLE-3. Left, light load: 80 requests at concurrency 1 in 59.92 s, output token throughput 281.09 tok/s, mean TTFT 29.28 ms, mean TPOT 3.38 ms, and an acceptance length of 2.28. Right, heavy load: 320 requests at concurrency 64 in 8.34 s, output token throughput 8062.66 tok/s, mean TTFT 195.31 ms, mean TPOT 6.38 ms, and an acceptance length of 2.28." caption="EAGLE-3. Left: light load. Right: heavy load" >}}
 
 #### 3.4 Speculative decoding with DSpark
 
@@ -595,9 +591,7 @@ modal run dspark_modal.py --server server.sh --client heavy.sh
 {{< /tab >}}
 {{< /tabs >}}
 
-{{< figure src="demo_bensmark_dspark-fix_light.png" link="demo_bensmark_dspark-fix_light.png" alt="vllm bench serve result with DSpark at a fixed draft length under light load: 80 requests at concurrency 1 in 42.04 s, output token throughput 397.85 tok/s, mean TTFT 34.70 ms, mean TPOT 2.33 ms, and an acceptance length of 3.76." caption="Light load with DSpark at a fixed draft length" >}}
-
-{{< figure src="demo_bensmark_dspark-fix_hevy.png" link="demo_bensmark_dspark-fix_hevy.png" alt="vllm bench serve result with DSpark at a fixed draft length under heavy load: 320 requests at concurrency 64 in 8.10 s, output token throughput 8328.94 tok/s, mean TTFT 227.04 ms, mean TPOT 6.05 ms, and an acceptance length of 3.78." caption="Heavy load with DSpark at a fixed draft length" >}}
+{{< figure src="demo_benchmark_dspark-fixed.png" link="demo_benchmark_dspark-fixed.png" alt="vllm bench serve results with DSpark at a fixed draft length. Left, light load: 80 requests at concurrency 1 in 42.04 s, output token throughput 397.85 tok/s, mean TTFT 34.70 ms, mean TPOT 2.33 ms, and an acceptance length of 3.76. Right, heavy load: 320 requests at concurrency 64 in 8.10 s, output token throughput 8328.94 tok/s, mean TTFT 227.04 ms, mean TPOT 6.05 ms, and an acceptance length of 3.78." caption="DSpark with a fixed draft length. Left: light load. Right: heavy load" >}}
 
 ##### 3.4.2 With adaptive verification
 
@@ -666,9 +660,7 @@ modal run dspark_modal.py --server server.sh --client heavy.sh
 {{< /tab >}}
 {{< /tabs >}}
 
-{{< figure src="demo_bensmark_dspark-notfix_light.png" link="demo_bensmark_dspark-notfix_light.png" alt="vllm bench serve result with DSpark and adaptive verification under light load: 80 requests at concurrency 1 in 44.85 s, output token throughput 372.88 tok/s, mean TTFT 24.85 ms, mean TPOT 2.52 ms, and an acceptance length of 3.76." caption="Light load with DSpark and adaptive verification" >}}
-
-{{< figure src="demo_bensmark_dspark-notfix_hevy.png" link="demo_bensmark_dspark-notfix_hevy.png" alt="vllm bench serve result with DSpark and adaptive verification under heavy load: 320 requests at concurrency 64 in 7.64 s, output token throughput 8851.21 tok/s, mean TTFT 96.54 ms, mean TPOT 7.96 ms, and an acceptance length of 3.57." caption="Heavy load with DSpark and adaptive verification" >}}
+{{< figure src="demo_benchmark_dspark-adaptive.png" link="demo_benchmark_dspark-adaptive.png" alt="vllm bench serve results with DSpark and adaptive verification. Left, light load: 80 requests at concurrency 1 in 44.85 s, output token throughput 372.88 tok/s, mean TTFT 24.85 ms, mean TPOT 2.52 ms, and an acceptance length of 3.76. Right, heavy load: 320 requests at concurrency 64 in 7.64 s, output token throughput 8851.21 tok/s, mean TTFT 96.54 ms, mean TPOT 7.96 ms, and an acceptance length of 3.57." caption="DSpark with adaptive verification. Left: light load. Right: heavy load" >}}
 
 ## 7. Takeaways
 
