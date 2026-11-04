@@ -27,9 +27,9 @@ There are many ways to tackle this problem, including prefill/decode disaggregat
 
 ## 2. What is speculative decoding?
 
-Speculative decoding takes advantage of the idle compute during decode. Modern GPUs have plenty of compute, so a large model can verify several tokens from a small model in one forward pass for nearly the same cost as generating a single token. A smaller drafter proposes the next k tokens, called a *draft block*. The large model, called the *target model*, then checks them all in one pass. If a draft token is rejected, the system keeps the accepted prefix and uses a token from the large model instead. With sampling, acceptance is probabilistic, but the output still follows the same distribution as the large model on its own. Every round generates at least one token.
+Speculative decoding takes advantage of the idle compute during decode. Modern GPUs have plenty of compute, so a large model can verify several tokens from a small model in one forward pass for nearly the same cost as generating a single token. A smaller drafter proposes the next k tokens, called a *draft block*. The large model, called the *target model*, then checks them all in one pass. If a draft token is rejected, the system keeps the accepted prefix and uses a token from the large model instead.
 
-The speedup depends on two things. First, how cheap the draft is. Second, how many draft tokens get accepted. The two main families of drafters trade these off differently.
+The speedup depends on two things. First, how cheap the draft is. Second, how many draft tokens get accepted. The two main types of drafters trade these off differently.
 
 ### 2.1 Autoregressive drafter
 
@@ -70,7 +70,7 @@ Parallel drafting makes long blocks cheap to produce, but verifying every drafte
 
 Put together, the two methods have a opposite disadvantage. Autoregressive drafters are weak at the first position, and parallel drafters get weaker at later ones. The first position matters most since a miss there throws away the whole block. DSpark targets this gap by retaining the parallel drafter's strong first position while reducing decay at later positions.
 
-Also, prior methods also either verify a fixed number of tokens or use a static confidence threshold. Neither accounts for current system load that can work under single-request assumptions, but in a high-concurrency production system, there are many issue that need to addresses. Before DSpark, DeepSeek's production serving used MTP-1, a single draft token, because deploying a static multi-token drafter (MTP-3 or MTP-5) degraded aggregate throughput under high concurrency.
+Also, prior methods also either verify a fixed number of tokens or use a static confidence threshold. Neither accounts for current system load that can work under single-request assumptions, but in a high-concurrency production system, there are many issues that need to addresses. Before DSpark, DeepSeek's production serving used MTP-1, a single draft token, because deploying a static multi-token drafter (MTP-3 or MTP-5) degraded aggregate throughput under high concurrency.
 
 ## 4. How DSpark works
 
@@ -196,7 +196,7 @@ From my perspective, a few more trade-offs are worth keeping in mind.
 
 ### Step 1. Install vLLM
 
-Install vLLM in a fresh Python environment. The `bench` extra adds the packages the benchmark tool needs to load datasets from Hugging Face. Then run `vllm download-kernels` to install FlashInfer's precompiled kernels. Even with Triton attention, vLLM uses FlashInfer for top-k and top-p sampling. Without the precompiled kernels, FlashInfer downloads and compiles them when the server starts, which can take several minutes.
+First we need to install vllm in a python evironment and in this demo we will use `bench` package to demonstrate DSpark. Then run `vllm download-kernels` to install FlashInfer's precompiled kernels to reduce start time. Even with Triton attention, vLLM uses FlashInfer for some processes.
 
 {{< tabs >}}
 {{< tab "GPU machine" >}}
@@ -206,14 +206,14 @@ vllm download-kernels
 ```
 {{< /tab >}}
 {{< tab "Modal" >}}
-[Modal](https://modal.com) runs the same install inside a container image, and every run gets its own H100, billed by the second. Modal needs a payment method on file before it lets you use GPUs. Install the Modal client and log in.
+[Modal](https://modal.com) runs the same install inside a container image, and every run gets its own H100, so first install the Modal client and log in.
 
 ```bash
 pip install modal
 modal setup
 ```
 
-Then create `dspark_modal.py`. Its `run` function plays both terminals. It starts the server commands in the background, waits until the server answers, runs the client commands, and then stops the server like Ctrl+C. The `!` in `H100!` keeps Modal from moving the run to an H200, so every benchmark runs on the same GPU.
+Then create `dspark_modal.py`. Its `run` function plays both terminals. It starts the server commands in the background, waits until the server answers, runs the client commands, and then stops the server like Ctrl+C. The `!` in `H100!` keeps Modal from moving the run to an H200.
 
 ```bash
 cat > dspark_modal.py <<'EOF'
@@ -278,7 +278,7 @@ EOF
 
 ### Step 2. Launch vLLM with DSpark
 
-Point `--speculative-config` at the DSpark drafter that matches your target model. The released Qwen3 drafters were trained with thinking mode turned off, so the server turns it off too. Prefix caching is disabled so that repeated benchmark runs do not reuse cached prompts and inflate the results. Adaptive verification also needs an attention backend whose CUDA graphs can handle a different number of tokens for each request. On GPUs such as the A100, L40S and RTX PRO 6000, vLLM's default FlashAttention 2 backend cannot do this and fails at startup, so the server uses Triton attention instead.
+Use `--speculative-config` to config a DSpark drafter that matches your target model. The released Qwen3 drafters were trained with thinking mode turned off, so the server turns it off too. Prefix caching is disabled so that repeated benchmark runs do not reuse cached prompts and inflate the results. Adaptive verification also needs an attention backend whose CUDA graphs can handle a different number of tokens for each request. Also, on GPUs such as the A100, L40S and RTX PRO 6000, vLLM's default FlashAttention 2 backend cannot do this and fails at startup, so the server uses Triton attention instead.
 
 {{< tabs >}}
 {{< tab "GPU machine" >}}
@@ -362,7 +362,7 @@ The reply should look like any normal Qwen3-8B answer. In the server log, a line
 
 ### Step 3. Benchmark light and heavy load
 
-Run the same two benchmarks against four servers. Every server runs the target model with Triton attention, so the differences come from speculative decoding alone. On a GPU machine, start each server in one terminal, run the benchmarks from a second terminal, and stop the server with Ctrl+C before starting the next one. On Modal, each `modal run` starts its server, runs both benchmarks and stops the server for you. Light load sends one request at a time, and heavy load keeps 64 requests in flight on the same GPU. The chat backend lets the server apply the chat template, so thinking stays off during the benchmark.
+In this demo we will run compare between Light load sends one request at a time, and heavy load keeps 64 requests with three comparsion such as no speculative decoding, using speculative decoding with EAGLE and using speculative decoding with DSpark.
 
 #### 3.1 No speculative decoding
 
@@ -435,11 +435,7 @@ modal run dspark_modal.py --server server.sh --client client.sh
 {{< /tab >}}
 {{< /tabs >}}
 
-#### 3.2 Speculative decoding with a fixed draft length
-
-Both servers below verify a fixed number of draft tokens for every request. The first uses EAGLE-3, a popular autoregressive drafter, and the second uses the DSpark drafter with adaptive verification turned off. Comparing the two shows how much DSpark's drafter helps on its own.
-
-##### 3.2.1 EAGLE-3
+#### 3.2 Speculative decoding with EAGLE-3
 
 EAGLE-3 drafts one token at a time, so each extra draft token costs another drafter pass. Red Hat's EAGLE-3 drafter for Qwen3-8B was trained with thinking turned off and recommends three draft tokens. Its training data differs from DeepSeek's drafters, so this compares the released drafters rather than reproducing the paper's Table 1.
 
@@ -520,7 +516,9 @@ modal run dspark_modal.py --server server.sh --client client.sh
 {{< /tab >}}
 {{< /tabs >}}
 
-##### 3.2.2 DSpark drafter with a fixed draft length
+#### 3.3 Speculative decoing with DSpark
+
+##### 3.3.1 with a fixed draft length
 
 This uses the same DSpark drafter as Step 2 with adaptive verification turned off, so every request verifies all 7 draft tokens, just like standard speculative decoding.
 
@@ -603,7 +601,7 @@ modal run dspark_modal.py --server server.sh --client client.sh
 {{< /tab >}}
 {{< /tabs >}}
 
-#### 3.3 DSpark with adaptive verification
+##### 3.3.2 with adaptive verification
 
 This is the same server as Step 2, with both the drafter and adaptive verification turned on.
 
@@ -686,7 +684,6 @@ modal run dspark_modal.py --server server.sh --client client.sh
 {{< /tab >}}
 {{< /tabs >}}
 
-Each benchmark prints a summary. Compare the output token throughput, which measures total system speed, and the mean TPOT, which measures how fast each user sees new tokens. At light load, all three speculative versions should run well ahead of the baseline, since the GPU has spare compute and extra draft tokens are almost free. Comparing 3.2.1 with 3.2.2 shows how much DSpark's drafter adds on its own. At heavy load, both fixed-length versions still verify every draft token for every request, so their lead shrinks. Adaptive verification trims the low-survival tokens as the batch fills up, so 3.3 should keep more of its speedup. To see how acceptance changes across domains, change `--dataset-path` to `openai/gsm8k` or `openai/openai_humaneval`.
 
 ## 7. Takeaways
 
