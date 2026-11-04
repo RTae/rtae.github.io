@@ -666,13 +666,6 @@ modal run dspark_modal.py --server server.sh --client heavy.sh
 
 The tables below collect the results from the screenshots above, all run on a Modal H100.
 
-| Light load | Output (tok/s) | Speedup | Mean TTFT (ms) | Mean TPOT (ms) | Time per round (ms) | Acceptance length |
-| --- | --- | --- | --- | --- | --- | --- |
-| Baseline | 146.48 | 1.00× | 28.19 | 6.72 | 6.72 | – |
-| EAGLE-3 | 281.09 | 1.92× | 29.28 | 3.38 | 7.81 | 2.28 |
-| DSpark, fixed | 397.85 | 2.72× | 34.70 | 2.33 | 8.78 | 3.76 |
-| DSpark, adaptive | 372.88 | 2.55× | 24.85 | 2.52 | 9.59 | 3.76 |
-
 | Heavy load | Output (tok/s) | Speedup | Mean TTFT (ms) | Mean TPOT (ms) | Median TPOT (ms) | P99 TPOT (ms) | Acceptance length |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Baseline | 6118.06 | 1.00× | 173.49 | 8.80 | 8.62 | 11.28 | – |
