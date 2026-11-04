@@ -27,9 +27,9 @@ There are many ways to tackle this problem, including prefill/decode disaggregat
 
 ## 2. What is speculative decoding?
 
-Speculative decoding takes advantage of the idle compute during decode. Modern GPUs have plenty of compute, so a large model can verify several tokens from a small model in one forward pass for nearly the same cost as generating a single token. A smaller drafter proposes the next k tokens, called a *draft block*. The large model, called the *target model*, then checks them all in one pass. If a draft token is rejected, the system keeps the accepted prefix and uses a token from the large model instead.
+Speculative decoding takes advantage of the underutilized computing power during decoding. Modern GPUs have plenty of compute, so a large model can verify several tokens from a small model in one forward pass for nearly the same cost as generating a single token. A smaller drafter proposes the next k tokens, called a *draft block*. The large model, called the *target model*, then checks them all in one pass. If a draft token is rejected, the system keeps the accepted prefix and uses a token from the large model instead.
 
-The speedup depends on two things. First, how cheap the draft is. Second, how many draft tokens get accepted. The two main types of drafters trade these off differently.
+The speedup depends on two things: how cheap the draft is and how many draft tokens get accepted. The two main types of drafters trade these off differently.
 
 ### 2.1 Autoregressive drafter
 
@@ -55,9 +55,9 @@ As shown on the left of the figure, each draft token needs its own drafter forwa
 
 {{< figure src="prior-parallel.png" link="prior-parallel.png" alt="Left: a parallel drafter picks each position independently and can mix of course and no problem into of problem or no course. Right: conditional acceptance on chat falls from 0.72 to 0.63 for DFlash while rising from 0.53 to 0.74 for EAGLE-3." caption="Left: independent position picks can collide. Right: conditional acceptance on chat" >}}
 
-A parallel drafter predicts every position in the block in one forward pass, so no position can see which token was actually sampled before it. Instead, each position must account for all the tokens that might come before it. As a result, when the context allows several continuations, different positions can lock onto different ones. For example, as shown on the left of the figure, if both "of course" and "no problem" fit, a parallel drafter may propose "of problem" or "no course". The paper calls this issue a *multi-modal collision*, and it causes *suffix decay*. The chance that a token is accepted tends to fall at later positions, even when every earlier token in the block was accepted. Therefore, for a pure parallel drafter, each extra position in a longer block tends to be worth less than the one before.
+A parallel drafter predicts every position in the block in one forward pass, so no position can see which token was actually sampled before it. Instead, each position must account for all the tokens that might come before it. As a result, when the context allows for several continuations, different positions can lock onto different ones. For example, as shown on the left of the figure, if both "of course" and "no problem" fit, a parallel drafter may propose "of problem" or "no course". The paper calls this issue a *multi-modal collision*, and it causes *suffix decay*. The chance that a token is accepted tends to fall at later positions, even when every earlier token in the block was accepted. Therefore, for a pure parallel drafter, each extra position in a longer block tends to be worth less than the one before.
 
-The right panel plots *conditional acceptance* at each position, that is, how often a token is accepted given that every token before it was. DFlash starts high but falls along the block, from 0.87 to 0.78 on code and from 0.72 to 0.63 on chat. However, EAGLE-3 does the opposite. It starts lower (0.53 on chat, the same first-position number as in 3.1), but because each of its tokens sees the ones before it, it holds steady or even improves deeper into the block (up to 0.74 on chat).
+The right panel plots *conditional acceptance* at each position, that is, how often a token is accepted given that every token before it was accepted. DFlash starts high but falls along the block, from 0.87 to 0.78 on code and from 0.72 to 0.63 on chat. However, EAGLE-3 does the opposite. It starts lower (0.53 on chat, the same first-position number as in 3.1), but because each of its tokens sees the ones before it, it holds steady or even improves deeper into the block (up to 0.74 on chat).
 
 ### 3.3 Verification length
 
@@ -65,12 +65,12 @@ The right panel plots *conditional acceptance* at each position, that is, how of
 
 Parallel drafting makes long blocks cheap to produce, but verifying every drafted token is not cheap. The ideal verification length changes along two axes.
 
-- **Data:** on the left of the figure, acceptance depends on the request. Structured text such as code sustains much higher acceptance than open-ended chat, so any single length is too short for some requests and too long for others.
-- **System load:** on the right of the figure, verifying an extra token at light load can be nearly free when the GPU has idle capacity and is waiting on memory anyway, so even a rejected token costs almost nothing. Under heavy load, every token sent for verification adds to the batch the target model processes in that step, and the step gets slower as that batch grows. A token that is likely to be rejected takes batch capacity that could have served another request.
+- **Data:** on the left of the figure, acceptance depends on the request. Structured text, such as code, sustains much higher acceptance than open-ended chat, so any single length is too short for some requests and too long for others.
+- **System load:** on the right of the figure, verifying an extra token at light load can be nearly free when the GPU has idle capacity and is waiting on memory anyway, so even a rejected token costs almost nothing. Under heavy load, every token sent for verification adds to the batch that the target model processes in that step, and the step gets slower as that batch grows. A token that is likely to be rejected takes batch capacity that could have served another request.
 
-Put together, the two methods have opposite disadvantages. Autoregressive drafters are weak at the first position, and parallel drafters get weaker at later ones. The first position matters most since a miss there throws away the whole block. DSpark targets this gap by retaining the parallel drafter's strong first position while reducing decay at later positions.
+Put together, the two methods have opposite disadvantages. Autoregressive drafters are weak at the first position, and parallel drafters become weaker at later ones. The first position matters most since a miss there throws away the whole block. DSpark targets this gap by retaining the parallel drafter's strong first position while reducing decay at later positions.
 
-Also, prior methods either verify a fixed number of tokens or use a static confidence threshold. Neither accounts for current system load. That can work under single-request assumptions, but not in a high-concurrency production system. Before DSpark, DeepSeek's production serving used MTP-1, a single draft token, because deploying a static multi-token drafter (MTP-3 or MTP-5) degraded aggregate throughput under high concurrency.
+Furthermore, prior methods either verify a fixed number of tokens or use a static confidence threshold. Neither accounts for the current system load. That can work under single-request assumptions, but not in a high-concurrency production system. Before DSpark, DeepSeek's production serving used MTP-1, a single draft token, because deploying a static multi-token drafter (MTP-3 or MTP-5) degraded aggregate throughput under high concurrency.
 
 ## 4. How DSpark works
 
@@ -102,7 +102,7 @@ Raw neural network scores are usually overconfident, so DSpark calibrates them f
 
 {{< figure src="prefix-scheduler.png" link="prefix-scheduler.png" alt="Step 1: three requests, code, math, and chat, each with five draft tokens and falling prefix survival. Step 2: pooling and sorting all 15 candidate tokens against profiled step time, expected tok/s peaks at 9 tokens under heavy load and 13 tokens under light load. Step 3: the prefixes kept under light load, 13 of 15, and heavy load, 9 of 15." caption="Hardware-aware prefix scheduler: (1) per-request prefix survival, (2) global ranking and step-time cutoff, and (3) selected prefixes under light vs. heavy load" >}}
 
-With the survival scores ready, the scheduler decides how many draft tokens to send to the target model across the whole batch. Each extra draft token can add accepted output, but it also makes the target model's batch larger and slower to run. To balance the two, the scheduler pools the draft tokens from every request, ranks them from highest to lowest survival, and adds them one at a time. A later token in a request never has a higher survival score than an earlier one, so the ranking always picks tokens from the start of each request's draft. For each possible batch size, the scheduler looks up the step time in a table profiled at startup and picks the size that gives the most expected accepted tokens per second. In the figure, extra tokens barely slow the step under light load, so the scheduler verifies 13 of the 15 draft tokens. Under heavy load, every extra token slows the whole batch, so only the 9 tokens with the highest survival make the cut.
+With the survival scores ready, the scheduler decides how many draft tokens the whole batch should verify. Each extra token can add accepted output, but it also makes the target's step slower. The scheduler ranks every request's draft tokens by survival and adds them one at a time. Survival never rises along a draft, so each request keeps a prefix. After each addition, it looks up the step time in a table measured at startup and stops once the expected accepted tokens per second drops, which keeps the output exact. In the figure, the scheduler keeps 13 of the 15 tokens under light load but only 9 under heavy load.
 
 {{< figure src="scheduler-production.png" link="scheduler-production.png" alt="Left: GPU step time rises in plateaus with sharp jumps at tile boundaries, so expected tok/s dips before reaching its true peak. Early stopping picks the first local peak, while a full-table search finds the true one. Right: while Step t-1 runs on the GPU, the scheduler uses Step t-2 confidences to fix the batch budget B* early, then fills those slots with the latest scores after Step t-1 finishes." caption="Two production adjustments: searching the full step-time table past tile-boundary dips, and using two-step lookback to size the batch without stalling the GPU pipeline" >}}
 
@@ -188,7 +188,7 @@ One limitation noted in the paper is that the scheduler only saves work on the t
 From my perspective, a few more trade-offs are worth keeping in mind.
 
 - **Offline tables measure draft quality, not speed:** Table 1 runs with the confidence scheduler turned off and a fixed block size of 7. That is a clean way to compare drafters, but real end-to-end speedup still depends on drafter overhead, batch size, and target step time.
-- **Using scores from two steps ago can lag sudden changes:** In the paper's design, the batch size is picked from scores two steps earlier. That works well when acceptance stays steady from round to round, but if a request suddenly switches from predictable code to open-ended writing, the number of tokens the scheduler verifies takes two rounds to catch up.
+- **Using scores from two steps ago can lag sudden changes:** in the paper's design, the batch size is picked from scores two steps earlier. That works well when acceptance stays steady from round to round, but if a request suddenly switches from predictable code to open-ended writing, the number of tokens the scheduler verifies takes two rounds to catch up.
 
 ## 6. Demo
 
@@ -281,7 +281,7 @@ EOF
 
 ### 2. Launch vLLM with DSpark
 
-Use `--speculative-config` to configure a DSpark drafter that matches your target model. The released Qwen3 drafters were trained with thinking mode turned off, so the server turns it off too. Prefix caching is disabled so that repeated benchmark runs do not reuse cached prompts and inflate the results. Adaptive verification also needs an attention backend whose CUDA graphs can handle a different number of tokens for each request. On GPUs such as the A100, L40S and RTX PRO 6000, vLLM's default FlashAttention 2 backend cannot do this and fails at startup, so the server uses Triton attention instead.
+Use `--speculative-config` to configure a DSpark drafter that matches your target model. The released Qwen3 drafters were trained with thinking mode turned off, so the server turns it off too. Prefix caching is disabled so that repeated benchmark runs do not reuse cached prompts and inflate the results. Adaptive verification also needs an attention backend whose CUDA graphs can handle a different number of tokens for each request. On GPUs such as the A100, L40S, and RTX PRO 6000, vLLM's default FlashAttention 2 backend cannot do this and fails at startup, so the server uses Triton attention instead.
 
 {{< tabs >}}
 {{< tab "GPU machine" >}}
