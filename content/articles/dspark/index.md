@@ -70,7 +70,7 @@ Parallel drafting makes long blocks cheap to produce, but verifying every drafte
 
 Put together, the two methods have opposite disadvantages. Autoregressive drafters are weak at the first position, and parallel drafters get weaker at later ones. The first position matters most since a miss there throws away the whole block. DSpark targets this gap by retaining the parallel drafter's strong first position while reducing decay at later positions.
 
-Also, prior methods either verify a fixed number of tokens or use a static confidence threshold. Neither accounts for current system load. That can work under single-request assumptions, but in a high-concurrency production system, there are many issues that need to be addressed. Before DSpark, DeepSeek's production serving used MTP-1, a single draft token, because deploying a static multi-token drafter (MTP-3 or MTP-5) degraded aggregate throughput under high concurrency.
+Also, prior methods either verify a fixed number of tokens or use a static confidence threshold. Neither accounts for current system load. That can work under single-request assumptions, but not in a high-concurrency production system. Before DSpark, DeepSeek's production serving used MTP-1, a single draft token, because deploying a static multi-token drafter (MTP-3 or MTP-5) degraded aggregate throughput under high concurrency.
 
 ## 4. How DSpark works
 
@@ -208,7 +208,7 @@ vllm download-kernels
 
 {{< /tab >}}
 {{< tab "Modal" >}}
-[Modal](https://modal.com) runs the same install inside a container image, and every run gets its own H100, so first install the Modal client and log in.
+[Modal](https://modal.com) runs the same install inside a container image, and every run gets its own H100. First, install the Modal client and log in.
 
 ```bash
 pip install modal
@@ -664,7 +664,7 @@ modal run dspark_modal.py --server server.sh --client heavy.sh
 
 #### 3.5 Results
 
-The tables below collect the results from the screenshots above, all run on a Modal H100.
+The table below collects the heavy-load results from the screenshots above, all run on a Modal H100.
 
 | Heavy load | Output (tok/s) | Speedup | Mean TTFT (ms) | Mean TPOT (ms) | Median TPOT (ms) | P99 TPOT (ms) | Acceptance length |
 | --- | --- | --- | --- | --- | --- | --- | --- |
