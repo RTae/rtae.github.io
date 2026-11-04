@@ -213,9 +213,10 @@ pip install modal
 modal setup
 ```
 
-Then save this script as `dspark_modal.py`. Its `run` function plays both terminals. It starts the server commands in the background, waits until the server answers, runs the client commands, and then stops the server like Ctrl+C. The `!` in `H100!` keeps Modal from moving the run to an H200, so every benchmark runs on the same GPU.
+Then create `dspark_modal.py`. Its `run` function plays both terminals. It starts the server commands in the background, waits until the server answers, runs the client commands, and then stops the server like Ctrl+C. The `!` in `H100!` keeps Modal from moving the run to an H200, so every benchmark runs on the same GPU.
 
-```python
+```bash
+cat > dspark_modal.py <<'EOF'
 import os
 import signal
 import subprocess
@@ -270,6 +271,7 @@ def run(server: str, client: str):
 def main(server: str, client: str):
     with open(server) as server_file, open(client) as client_file:
         run.remote(server_file.read(), client_file.read())
+EOF
 ```
 {{< /tab >}}
 {{< /tabs >}}
@@ -313,10 +315,10 @@ curl http://localhost:8000/v1/chat/completions \
 ```
 {{< /tab >}}
 {{< tab "Modal" >}}
-Save each terminal's commands as a file, then run both on Modal. The first run takes about ten minutes because it builds the image and downloads both models. Later runs reuse them and start in about three minutes.
+Save the server command and the test request as files, then run both on Modal. The first run takes about ten minutes because it builds the image and downloads both models. Later runs reuse them and start in about three minutes.
 
 ```bash
-# Terminal 1 commands: start the server
+# Save the server command
 cat > server.sh <<'EOF'
 vllm serve Qwen/Qwen3-8B \
   --max-model-len 16384 \
@@ -331,8 +333,10 @@ vllm serve Qwen/Qwen3-8B \
     "enable_adaptive_verification": true
   }'
 EOF
+```
 
-# Terminal 2 commands: send a test request
+```bash
+# Save the test request
 cat > client.sh <<'EOF'
 curl http://localhost:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
@@ -345,7 +349,9 @@ curl http://localhost:8000/v1/chat/completions \
     "temperature": 0
   }'
 EOF
+```
 
+```bash
 # Run both on a Modal H100
 modal run dspark_modal.py --server server.sh --client client.sh
 ```
@@ -392,7 +398,7 @@ vllm bench serve \
 {{< /tab >}}
 {{< tab "Modal" >}}
 ```bash
-# Terminal 1 commands: start the server
+# Save the server command
 cat > server.sh <<'EOF'
 vllm serve Qwen/Qwen3-8B \
   --max-model-len 16384 \
@@ -401,8 +407,10 @@ vllm serve Qwen/Qwen3-8B \
   --attention-backend TRITON_ATTN \
   --default-chat-template-kwargs '{"enable_thinking": false}'
 EOF
+```
 
-# Terminal 2 commands: light load, then heavy load
+```bash
+# Save the light and heavy load benchmarks
 cat > client.sh <<'EOF'
 # light load, one request at a time
 vllm bench serve \
@@ -418,7 +426,9 @@ vllm bench serve \
   --dataset-name hf --dataset-path philschmid/mt-bench \
   --num-prompts 320 --max-concurrency 64
 EOF
+```
 
+```bash
 # Run both on a Modal H100
 modal run dspark_modal.py --server server.sh --client client.sh
 ```
@@ -468,7 +478,7 @@ vllm bench serve \
 {{< /tab >}}
 {{< tab "Modal" >}}
 ```bash
-# Terminal 1 commands: start the server
+# Save the server command
 cat > server.sh <<'EOF'
 vllm serve Qwen/Qwen3-8B \
   --max-model-len 16384 \
@@ -482,8 +492,10 @@ vllm serve Qwen/Qwen3-8B \
     "num_speculative_tokens": 3
   }'
 EOF
+```
 
-# Terminal 2 commands: light load, then heavy load
+```bash
+# Save the light and heavy load benchmarks
 cat > client.sh <<'EOF'
 # light load, one request at a time
 vllm bench serve \
@@ -499,7 +511,9 @@ vllm bench serve \
   --dataset-name hf --dataset-path philschmid/mt-bench \
   --num-prompts 320 --max-concurrency 64
 EOF
+```
 
+```bash
 # Run both on a Modal H100
 modal run dspark_modal.py --server server.sh --client client.sh
 ```
@@ -546,7 +560,7 @@ vllm bench serve \
 {{< /tab >}}
 {{< tab "Modal" >}}
 ```bash
-# Terminal 1 commands: start the server
+# Save the server command
 cat > server.sh <<'EOF'
 vllm serve Qwen/Qwen3-8B \
   --max-model-len 16384 \
@@ -561,8 +575,10 @@ vllm serve Qwen/Qwen3-8B \
     "enable_adaptive_verification": false
   }'
 EOF
+```
 
-# Terminal 2 commands: light load, then heavy load
+```bash
+# Save the light and heavy load benchmarks
 cat > client.sh <<'EOF'
 # light load, one request at a time
 vllm bench serve \
@@ -578,7 +594,9 @@ vllm bench serve \
   --dataset-name hf --dataset-path philschmid/mt-bench \
   --num-prompts 320 --max-concurrency 64
 EOF
+```
 
+```bash
 # Run both on a Modal H100
 modal run dspark_modal.py --server server.sh --client client.sh
 ```
@@ -625,7 +643,7 @@ vllm bench serve \
 {{< /tab >}}
 {{< tab "Modal" >}}
 ```bash
-# Terminal 1 commands: start the server
+# Save the server command
 cat > server.sh <<'EOF'
 vllm serve Qwen/Qwen3-8B \
   --max-model-len 16384 \
@@ -640,8 +658,10 @@ vllm serve Qwen/Qwen3-8B \
     "enable_adaptive_verification": true
   }'
 EOF
+```
 
-# Terminal 2 commands: light load, then heavy load
+```bash
+# Save the light and heavy load benchmarks
 cat > client.sh <<'EOF'
 # light load, one request at a time
 vllm bench serve \
@@ -657,7 +677,9 @@ vllm bench serve \
   --dataset-name hf --dataset-path philschmid/mt-bench \
   --num-prompts 320 --max-concurrency 64
 EOF
+```
 
+```bash
 # Run both on a Modal H100
 modal run dspark_modal.py --server server.sh --client client.sh
 ```
