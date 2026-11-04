@@ -364,6 +364,8 @@ modal run dspark_modal.py --server server.sh --client client.sh
 {{< /tab >}}
 {{< /tabs >}}
 
+{{< figure src="demo_request.png" link="demo_request.png" alt="Server log after the test request: the JSON reply with a Python binary search function and 256 completion tokens, followed by SpecDecoding metrics with a mean acceptance length of 7.40, 224 of 245 draft tokens accepted, and per-position acceptance falling from 1.000 to 0.829." caption="The test request's reply and the SpecDecoding metrics line" >}}
+
 The reply should look like any normal Qwen3-8B answer. In the server log, a line starting with `SpecDecoding metrics` reports the mean acceptance length, the average number of tokens each round produces, including the target model's own token.
 
 ### 3. Benchmark light and heavy load
@@ -451,6 +453,10 @@ modal run dspark_modal.py --server server.sh --client heavy.sh
 {{< /tab >}}
 {{< /tabs >}}
 
+{{< figure src="demo_bensmark_no_light.png" link="demo_bensmark_no_light.png" alt="vllm bench serve result without speculative decoding at light load: 80 requests at concurrency 1 in 112.90 s, output token throughput 146.48 tok/s, mean TTFT 28.19 ms, and mean TPOT 6.72 ms." caption="Light load without speculative decoding" >}}
+
+{{< figure src="demo_bensmark_no_hevey.png" link="demo_bensmark_no_hevey.png" alt="vllm bench serve result without speculative decoding at heavy load: 320 requests at concurrency 64 in 11.01 s, output token throughput 6118.06 tok/s, mean TTFT 173.49 ms, and mean TPOT 8.80 ms." caption="Heavy load without speculative decoding" >}}
+
 #### 3.3 Speculative decoding with EAGLE-3
 
 EAGLE-3 drafts one token at a time, so each extra draft token costs another drafter pass. Red Hat's EAGLE-3 drafter for Qwen3-8B was trained with thinking turned off and recommends three draft tokens. Its training data differs from DeepSeek's drafters, so this compares the released drafters rather than reproducing the paper's Table 1.
@@ -515,6 +521,10 @@ modal run dspark_modal.py --server server.sh --client heavy.sh
 
 {{< /tab >}}
 {{< /tabs >}}
+
+{{< figure src="demo_bensmark_eagle3_light.png" link="demo_bensmark_eagle3_light.png" alt="vllm bench serve result with EAGLE-3 at light load: 80 requests at concurrency 1 in 59.92 s, output token throughput 281.09 tok/s, mean TTFT 29.28 ms, mean TPOT 3.38 ms, and an acceptance length of 2.28." caption="Light load with EAGLE-3" >}}
+
+{{< figure src="demo_bensmark_eagle3_hevey.png" link="demo_bensmark_eagle3_hevey.png" alt="vllm bench serve result with EAGLE-3 at heavy load: 320 requests at concurrency 64 in 8.34 s, output token throughput 8062.66 tok/s, mean TTFT 195.31 ms, mean TPOT 6.38 ms, and an acceptance length of 2.28." caption="Heavy load with EAGLE-3" >}}
 
 #### 3.4 Speculative decoding with DSpark
 
@@ -585,6 +595,10 @@ modal run dspark_modal.py --server server.sh --client heavy.sh
 {{< /tab >}}
 {{< /tabs >}}
 
+{{< figure src="demo_bensmark_dspark-fix_light.png" link="demo_bensmark_dspark-fix_light.png" alt="vllm bench serve result with DSpark at a fixed draft length under light load: 80 requests at concurrency 1 in 42.04 s, output token throughput 397.85 tok/s, mean TTFT 34.70 ms, mean TPOT 2.33 ms, and an acceptance length of 3.76." caption="Light load with DSpark at a fixed draft length" >}}
+
+{{< figure src="demo_bensmark_dspark-fix_hevy.png" link="demo_bensmark_dspark-fix_hevy.png" alt="vllm bench serve result with DSpark at a fixed draft length under heavy load: 320 requests at concurrency 64 in 8.10 s, output token throughput 8328.94 tok/s, mean TTFT 227.04 ms, mean TPOT 6.05 ms, and an acceptance length of 3.78." caption="Heavy load with DSpark at a fixed draft length" >}}
+
 ##### 3.4.2 With adaptive verification
 
 This is the same server as Step 2, with both the drafter and adaptive verification turned on.
@@ -652,6 +666,10 @@ modal run dspark_modal.py --server server.sh --client heavy.sh
 {{< /tab >}}
 {{< /tabs >}}
 
+{{< figure src="demo_bensmark_dspark-notfix_light.png" link="demo_bensmark_dspark-notfix_light.png" alt="vllm bench serve result with DSpark and adaptive verification under light load: 80 requests at concurrency 1 in 44.85 s, output token throughput 372.88 tok/s, mean TTFT 24.85 ms, mean TPOT 2.52 ms, and an acceptance length of 3.76." caption="Light load with DSpark and adaptive verification" >}}
+
+{{< figure src="demo_bensmark_dspark-notfix_hevy.png" link="demo_bensmark_dspark-notfix_hevy.png" alt="vllm bench serve result with DSpark and adaptive verification under heavy load: 320 requests at concurrency 64 in 7.64 s, output token throughput 8851.21 tok/s, mean TTFT 96.54 ms, mean TPOT 7.96 ms, and an acceptance length of 3.57." caption="Heavy load with DSpark and adaptive verification" >}}
+
 ## 7. Takeaways
 
 - **Drafting and verification solve different problems.** A deep parallel backbone with a tiny Markov head makes it cheap to draft long, coherent blocks, while a separate scheduler decides how many of those tokens are worth sending to the target model.
@@ -660,4 +678,4 @@ modal run dspark_modal.py --server server.sh --client heavy.sh
 
 ---
 
-*Paper: [arXiv:2607.05147](https://arxiv.org/abs/2607.05147). All figures are illustrative redraws; paper-specific examples and numerical results are based on the DSpark paper.*
+*Paper: [arXiv:2607.05147](https://arxiv.org/abs/2607.05147). All figures except the demo screenshots are illustrative redraws; paper-specific examples and numerical results are based on the DSpark paper.*
