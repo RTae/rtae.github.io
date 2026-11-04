@@ -196,17 +196,90 @@ From my perspective, a few more trade-offs are worth keeping in mind.
 
 ### Step 1. Install vLLM
 
-Install vLLM in a fresh Python environment. The `bench` extra adds the packages the benchmark tool needs to load datasets from Hugging Face. Then run `vllm download-kernels` to install FlashInfer's precompiled kernels. Without them, FlashInfer downloads and compiles its kernels when the server starts, which can take several minutes.
+Install vLLM in a fresh Python environment. The `bench` extra adds the packages the benchmark tool needs to load datasets from Hugging Face. Then run `vllm download-kernels` to install FlashInfer's precompiled kernels. Even with Triton attention, vLLM uses FlashInfer for top-k and top-p sampling. Without the precompiled kernels, FlashInfer downloads and compiles them when the server starts, which can take several minutes.
 
+{{< tabs >}}
+{{< tab "GPU machine" >}}
 ```bash
 pip install -U "vllm[bench]"
 vllm download-kernels
 ```
+{{< /tab >}}
+{{< tab "Modal" >}}
+On [Modal](https://modal.com), the same install runs inside a container image, and every run gets its own H100, billed by the second. Modal needs a payment method on file before it lets you use GPUs. Install the Modal client and log in.
+
+```bash
+pip install modal
+modal setup
+```
+
+Then save this script as `dspark_modal.py`. Its `run` function plays both terminals. It starts the server commands in the background, waits until the server answers, runs the client commands, and then stops the server like Ctrl+C. The `!` in `H100!` keeps Modal from moving the run to an H200, so every benchmark runs on the same GPU.
+
+```python
+import os
+import signal
+import subprocess
+import time
+import urllib.request
+
+import modal
+
+app = modal.App("dspark-demo")
+
+# Step 1 on Modal: a container image with vLLM installed
+image = (
+    modal.Image.from_registry("nvidia/cuda:13.0.3-devel-ubuntu24.04", add_python="3.12")
+    .entrypoint([])
+    .apt_install("curl")
+    .uv_pip_install("vllm[bench]")
+    .run_commands("vllm download-kernels", gpu="H100")  # vllm needs a GPU to start
+)
+
+# Keep downloaded models and compiled kernels between runs
+volumes = {
+    "/root/.cache/huggingface": modal.Volume.from_name("dspark-hf-cache", create_if_missing=True),
+    "/root/.cache/vllm": modal.Volume.from_name("dspark-vllm-cache", create_if_missing=True),
+}
+
+
+@app.function(image=image, gpu="H100!", volumes=volumes, timeout=60 * 60)
+def run(server: str, client: str):
+    # Terminal 1: start the server in the background
+    server_process = subprocess.Popen(["bash", "-c", server], start_new_session=True)
+
+    # Wait until the server answers, which happens after "Application startup complete"
+    while True:
+        try:
+            urllib.request.urlopen("http://localhost:8000/health")
+            break
+        except OSError:
+            if server_process.poll() is not None:
+                raise RuntimeError("vllm serve exited before it was ready")
+            time.sleep(5)
+
+    # Terminal 2: run the client commands against the server
+    subprocess.run(["bash", "-c", client], check=True)
+
+    # Wait for the server's next stats log, then stop it like Ctrl+C
+    time.sleep(15)
+    os.killpg(server_process.pid, signal.SIGINT)
+    server_process.wait()
+
+
+@app.local_entrypoint()
+def main(server: str, client: str):
+    with open(server) as server_file, open(client) as client_file:
+        run.remote(server_file.read(), client_file.read())
+```
+{{< /tab >}}
+{{< /tabs >}}
 
 ### Step 2. Launch vLLM with DSpark
 
 Point `--speculative-config` at the DSpark drafter that matches your target model. The released Qwen3 drafters were trained with thinking mode turned off, so the server turns it off too. Prefix caching is disabled so that repeated benchmark runs do not reuse cached prompts and inflate the results. Adaptive verification also needs an attention backend whose CUDA graphs can handle a different number of tokens for each request. On GPUs such as the A100, L40S and RTX PRO 6000, vLLM's default FlashAttention 2 backend cannot do this and fails at startup, so the server uses Triton attention instead.
 
+{{< tabs >}}
+{{< tab "GPU machine" >}}
 ```bash
 # Terminal 1: start the server
 vllm serve Qwen/Qwen3-8B \
@@ -238,17 +311,59 @@ curl http://localhost:8000/v1/chat/completions \
     "temperature": 0
   }'
 ```
+{{< /tab >}}
+{{< tab "Modal" >}}
+Save each terminal's commands as a file, then run both on Modal. The first run takes about ten minutes because it builds the image and downloads both models. Later runs reuse them and start in about three minutes.
 
-The reply should look like any normal Qwen3-8B answer. Back in the server log, a line starting with `SpecDecoding metrics` reports the mean acceptance length, the average number of tokens each round produces, including the target model's own token.
+```bash
+# Terminal 1 commands: start the server
+cat > server.sh <<'EOF'
+vllm serve Qwen/Qwen3-8B \
+  --max-model-len 16384 \
+  --gpu-memory-utilization 0.85 \
+  --no-enable-prefix-caching \
+  --attention-backend TRITON_ATTN \
+  --default-chat-template-kwargs '{"enable_thinking": false}' \
+  --speculative-config '{
+    "method": "dspark",
+    "model": "deepseek-ai/dspark_qwen3_8b_block7",
+    "num_speculative_tokens": 7,
+    "enable_adaptive_verification": true
+  }'
+EOF
+
+# Terminal 2 commands: send a test request
+cat > client.sh <<'EOF'
+curl http://localhost:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "Qwen/Qwen3-8B",
+    "messages": [
+      {"role": "user", "content": "Write a Python function for binary search."}
+    ],
+    "max_tokens": 256,
+    "temperature": 0
+  }'
+EOF
+
+# Run both on a Modal H100
+modal run dspark_modal.py --server server.sh --client client.sh
+```
+{{< /tab >}}
+{{< /tabs >}}
+
+The reply should look like any normal Qwen3-8B answer. In the server log, a line starting with `SpecDecoding metrics` reports the mean acceptance length, the average number of tokens each round produces, including the target model's own token.
 
 ### Step 3. Benchmark light and heavy load
 
-Run the same two benchmarks against four servers. Every server uses Triton attention, so the differences come from speculative decoding alone. Start each server in one terminal, run the benchmarks from a second terminal, and stop the server with Ctrl+C before starting the next one. Light load sends one request at a time, and heavy load keeps 64 requests in flight on the same GPU. The chat backend lets the server apply the chat template, so thinking stays off during the benchmark.
+Run the same two benchmarks against four servers. Every server runs the target model with Triton attention, so the differences come from speculative decoding alone. On a GPU machine, start each server in one terminal, run the benchmarks from a second terminal, and stop the server with Ctrl+C before starting the next one. On Modal, each `modal run` starts its server, runs both benchmarks and stops the server for you. Light load sends one request at a time, and heavy load keeps 64 requests in flight on the same GPU. The chat backend lets the server apply the chat template, so thinking stays off during the benchmark.
 
 #### 3.1 No speculative decoding
 
 This is the baseline, where the target model generates one token per step.
 
+{{< tabs >}}
+{{< tab "GPU machine" >}}
 ```bash
 # Terminal 1: start the server
 vllm serve Qwen/Qwen3-8B \
@@ -274,6 +389,41 @@ vllm bench serve \
   --dataset-name hf --dataset-path philschmid/mt-bench \
   --num-prompts 320 --max-concurrency 64
 ```
+{{< /tab >}}
+{{< tab "Modal" >}}
+```bash
+# Terminal 1 commands: start the server
+cat > server.sh <<'EOF'
+vllm serve Qwen/Qwen3-8B \
+  --max-model-len 16384 \
+  --gpu-memory-utilization 0.85 \
+  --no-enable-prefix-caching \
+  --attention-backend TRITON_ATTN \
+  --default-chat-template-kwargs '{"enable_thinking": false}'
+EOF
+
+# Terminal 2 commands: light load, then heavy load
+cat > client.sh <<'EOF'
+# light load, one request at a time
+vllm bench serve \
+  --backend openai-chat --endpoint /v1/chat/completions \
+  --model Qwen/Qwen3-8B --skip-chat-template \
+  --dataset-name hf --dataset-path philschmid/mt-bench \
+  --num-prompts 80 --max-concurrency 1
+
+# heavy load, 64 requests at a time
+vllm bench serve \
+  --backend openai-chat --endpoint /v1/chat/completions \
+  --model Qwen/Qwen3-8B --skip-chat-template \
+  --dataset-name hf --dataset-path philschmid/mt-bench \
+  --num-prompts 320 --max-concurrency 64
+EOF
+
+# Run both on a Modal H100
+modal run dspark_modal.py --server server.sh --client client.sh
+```
+{{< /tab >}}
+{{< /tabs >}}
 
 #### 3.2 Speculative decoding with a fixed draft length
 
@@ -283,6 +433,8 @@ Both servers below verify a fixed number of draft tokens for every request. The 
 
 EAGLE-3 drafts one token at a time, so each extra draft token costs another drafter pass. Red Hat's EAGLE-3 drafter for Qwen3-8B was trained with thinking turned off and recommends three draft tokens. Its training data differs from DeepSeek's drafters, so this compares the released drafters rather than reproducing the paper's Table 1.
 
+{{< tabs >}}
+{{< tab "GPU machine" >}}
 ```bash
 # Terminal 1: start the server
 vllm serve Qwen/Qwen3-8B \
@@ -313,11 +465,53 @@ vllm bench serve \
   --dataset-name hf --dataset-path philschmid/mt-bench \
   --num-prompts 320 --max-concurrency 64
 ```
+{{< /tab >}}
+{{< tab "Modal" >}}
+```bash
+# Terminal 1 commands: start the server
+cat > server.sh <<'EOF'
+vllm serve Qwen/Qwen3-8B \
+  --max-model-len 16384 \
+  --gpu-memory-utilization 0.85 \
+  --no-enable-prefix-caching \
+  --attention-backend TRITON_ATTN \
+  --default-chat-template-kwargs '{"enable_thinking": false}' \
+  --speculative-config '{
+    "method": "eagle3",
+    "model": "RedHatAI/Qwen3-8B-speculator.eagle3",
+    "num_speculative_tokens": 3
+  }'
+EOF
+
+# Terminal 2 commands: light load, then heavy load
+cat > client.sh <<'EOF'
+# light load, one request at a time
+vllm bench serve \
+  --backend openai-chat --endpoint /v1/chat/completions \
+  --model Qwen/Qwen3-8B --skip-chat-template \
+  --dataset-name hf --dataset-path philschmid/mt-bench \
+  --num-prompts 80 --max-concurrency 1
+
+# heavy load, 64 requests at a time
+vllm bench serve \
+  --backend openai-chat --endpoint /v1/chat/completions \
+  --model Qwen/Qwen3-8B --skip-chat-template \
+  --dataset-name hf --dataset-path philschmid/mt-bench \
+  --num-prompts 320 --max-concurrency 64
+EOF
+
+# Run both on a Modal H100
+modal run dspark_modal.py --server server.sh --client client.sh
+```
+{{< /tab >}}
+{{< /tabs >}}
 
 ##### 3.2.2 DSpark drafter with a fixed draft length
 
 This uses the same DSpark drafter as Step 2 with adaptive verification turned off, so every request verifies all 7 draft tokens, just like standard speculative decoding.
 
+{{< tabs >}}
+{{< tab "GPU machine" >}}
 ```bash
 # Terminal 1: start the server
 vllm serve Qwen/Qwen3-8B \
@@ -349,11 +543,54 @@ vllm bench serve \
   --dataset-name hf --dataset-path philschmid/mt-bench \
   --num-prompts 320 --max-concurrency 64
 ```
+{{< /tab >}}
+{{< tab "Modal" >}}
+```bash
+# Terminal 1 commands: start the server
+cat > server.sh <<'EOF'
+vllm serve Qwen/Qwen3-8B \
+  --max-model-len 16384 \
+  --gpu-memory-utilization 0.85 \
+  --no-enable-prefix-caching \
+  --attention-backend TRITON_ATTN \
+  --default-chat-template-kwargs '{"enable_thinking": false}' \
+  --speculative-config '{
+    "method": "dspark",
+    "model": "deepseek-ai/dspark_qwen3_8b_block7",
+    "num_speculative_tokens": 7,
+    "enable_adaptive_verification": false
+  }'
+EOF
+
+# Terminal 2 commands: light load, then heavy load
+cat > client.sh <<'EOF'
+# light load, one request at a time
+vllm bench serve \
+  --backend openai-chat --endpoint /v1/chat/completions \
+  --model Qwen/Qwen3-8B --skip-chat-template \
+  --dataset-name hf --dataset-path philschmid/mt-bench \
+  --num-prompts 80 --max-concurrency 1
+
+# heavy load, 64 requests at a time
+vllm bench serve \
+  --backend openai-chat --endpoint /v1/chat/completions \
+  --model Qwen/Qwen3-8B --skip-chat-template \
+  --dataset-name hf --dataset-path philschmid/mt-bench \
+  --num-prompts 320 --max-concurrency 64
+EOF
+
+# Run both on a Modal H100
+modal run dspark_modal.py --server server.sh --client client.sh
+```
+{{< /tab >}}
+{{< /tabs >}}
 
 #### 3.3 DSpark with adaptive verification
 
 This is the same server as Step 2, with both the drafter and adaptive verification turned on.
 
+{{< tabs >}}
+{{< tab "GPU machine" >}}
 ```bash
 # Terminal 1: start the server
 vllm serve Qwen/Qwen3-8B \
@@ -385,6 +622,47 @@ vllm bench serve \
   --dataset-name hf --dataset-path philschmid/mt-bench \
   --num-prompts 320 --max-concurrency 64
 ```
+{{< /tab >}}
+{{< tab "Modal" >}}
+```bash
+# Terminal 1 commands: start the server
+cat > server.sh <<'EOF'
+vllm serve Qwen/Qwen3-8B \
+  --max-model-len 16384 \
+  --gpu-memory-utilization 0.85 \
+  --no-enable-prefix-caching \
+  --attention-backend TRITON_ATTN \
+  --default-chat-template-kwargs '{"enable_thinking": false}' \
+  --speculative-config '{
+    "method": "dspark",
+    "model": "deepseek-ai/dspark_qwen3_8b_block7",
+    "num_speculative_tokens": 7,
+    "enable_adaptive_verification": true
+  }'
+EOF
+
+# Terminal 2 commands: light load, then heavy load
+cat > client.sh <<'EOF'
+# light load, one request at a time
+vllm bench serve \
+  --backend openai-chat --endpoint /v1/chat/completions \
+  --model Qwen/Qwen3-8B --skip-chat-template \
+  --dataset-name hf --dataset-path philschmid/mt-bench \
+  --num-prompts 80 --max-concurrency 1
+
+# heavy load, 64 requests at a time
+vllm bench serve \
+  --backend openai-chat --endpoint /v1/chat/completions \
+  --model Qwen/Qwen3-8B --skip-chat-template \
+  --dataset-name hf --dataset-path philschmid/mt-bench \
+  --num-prompts 320 --max-concurrency 64
+EOF
+
+# Run both on a Modal H100
+modal run dspark_modal.py --server server.sh --client client.sh
+```
+{{< /tab >}}
+{{< /tabs >}}
 
 Each benchmark prints a summary. Compare the output token throughput, which measures total system speed, and the mean TPOT, which measures how fast each user sees new tokens. At light load, all three speculative versions should run well ahead of the baseline, since the GPU has spare compute and extra draft tokens are almost free. Comparing 3.2.1 with 3.2.2 shows how much DSpark's drafter adds on its own. At heavy load, both fixed-length versions still verify every draft token for every request, so their lead shrinks. Adaptive verification trims the low-survival tokens as the batch fills up, so 3.3 should keep more of its speedup. To see how acceptance changes across domains, change `--dataset-path` to `openai/gsm8k` or `openai/openai_humaneval`.
 
