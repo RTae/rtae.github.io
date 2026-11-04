@@ -68,9 +68,9 @@ Parallel drafting makes long blocks cheap to produce, but verifying every drafte
 - **Data:** on the left of the figure, acceptance depends on the request. Structured text such as code sustains much higher acceptance than open-ended chat, so any single length is too short for some requests and too long for others.
 - **System load:** on the right of the figure, verifying an extra token at light load can be nearly free when the GPU has idle capacity and is waiting on memory anyway, so even a rejected token costs almost nothing. Under heavy load, every token sent for verification adds to the batch the target model processes in that step, and the step gets slower as that batch grows. A token that is likely to be rejected takes batch capacity that could have served another request.
 
-Put together, the two families fail in opposite places. Autoregressive drafters are weak at the first position, and parallel drafters get weaker at later ones. The first position matters most since a miss there throws away the whole block. DSpark targets this gap by retaining the parallel drafter's strong first position while reducing decay at later positions.
+Put together, the two methods have a opposite disadvantage. Autoregressive drafters are weak at the first position, and parallel drafters get weaker at later ones. The first position matters most since a miss there throws away the whole block. DSpark targets this gap by retaining the parallel drafter's strong first position while reducing decay at later positions.
 
-Prior methods also either verify a fixed number of tokens or use a static confidence threshold. Neither accounts for current system load. That can work under single-request assumptions, but it is suboptimal in a high-concurrency production system. Before DSpark, DeepSeek's production serving used MTP-1, a single draft token, because deploying a static multi-token drafter (MTP-3 or MTP-5) degraded aggregate throughput under high concurrency.
+Also, prior methods also either verify a fixed number of tokens or use a static confidence threshold. Neither accounts for current system load that can work under single-request assumptions, but in a high-concurrency production system, there are many issue that need to addresses. Before DSpark, DeepSeek's production serving used MTP-1, a single draft token, because deploying a static multi-token drafter (MTP-3 or MTP-5) degraded aggregate throughput under high concurrency.
 
 ## 4. How DSpark works
 
@@ -206,7 +206,7 @@ vllm download-kernels
 ```
 {{< /tab >}}
 {{< tab "Modal" >}}
-On [Modal](https://modal.com), the same install runs inside a container image, and every run gets its own H100, billed by the second. Modal needs a payment method on file before it lets you use GPUs. Install the Modal client and log in.
+[Modal](https://modal.com) runs the same install inside a container image, and every run gets its own H100, billed by the second. Modal needs a payment method on file before it lets you use GPUs. Install the Modal client and log in.
 
 ```bash
 pip install modal
