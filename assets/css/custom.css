@@ -281,3 +281,35 @@ dialog.zoom img {
 .tab-panel > :first-child {
     margin-top: 0;
 }
+
+/* ---------------------------------------------------------------------------
+   Copy buttons on code blocks (assets/js/copy-code.js)
+
+   Code blocks use Chroma's dark Monokai background in both colour schemes, so
+   the button is drawn light-on-dark to match it.
+--------------------------------------------------------------------------- */
+.highlight,
+.code-block {
+    position: relative;
+}
+
+.copy-code {
+    position: absolute;
+    top: 0.5em;
+    right: 0.5em;
+    padding: 0 0.6em;
+    font: inherit;
+    font-size: 0.8em;
+    line-height: 1.8;
+    color: #f8f8f2;
+    background: #3e3d32;
+    border: 1px solid #75715e;
+    border-radius: 3px;
+    cursor: pointer;
+    opacity: 0.75;
+}
+
+.copy-code:hover,
+.copy-code:focus-visible {
+    opacity: 1;
+}

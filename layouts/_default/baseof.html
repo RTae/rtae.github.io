@@ -24,6 +24,11 @@
       {{ $js := . | minify | fingerprint }}
       <script src="{{ $js.RelPermalink }}" integrity="{{ $js.Data.Integrity }}" defer></script>
     {{ end }}
+    {{- /* Copy buttons on code blocks; deferred like zoom.js. */ -}}
+    {{ with resources.Get "js/copy-code.js" }}
+      {{ $js := . | minify | fingerprint }}
+      <script src="{{ $js.RelPermalink }}" integrity="{{ $js.Data.Integrity }}" defer></script>
+    {{ end }}
 
     {{- partial "favicon.html" . -}}
     {{ with .OutputFormats.Get "RSS" }}
