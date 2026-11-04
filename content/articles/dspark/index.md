@@ -662,6 +662,26 @@ modal run dspark_modal.py --server server.sh --client heavy.sh
 
 {{< figure src="demo_benchmark_dspark-adaptive.png" link="demo_benchmark_dspark-adaptive.png" alt="vllm bench serve results with DSpark and adaptive verification. Left, light load: 80 requests at concurrency 1 in 44.85 s, output token throughput 372.88 tok/s, mean TTFT 24.85 ms, mean TPOT 2.52 ms, and an acceptance length of 3.76. Right, heavy load: 320 requests at concurrency 64 in 7.64 s, output token throughput 8851.21 tok/s, mean TTFT 96.54 ms, mean TPOT 7.96 ms, and an acceptance length of 3.57." caption="DSpark with adaptive verification. Left: light load. Right: heavy load" >}}
 
+#### 3.5 Results
+
+The tables below collect the results from the screenshots above, all run on a Modal H100.
+
+| Light load | Output (tok/s) | Speedup | Mean TTFT (ms) | Mean TPOT (ms) | Time per round (ms) | Acceptance length |
+| --- | --- | --- | --- | --- | --- | --- |
+| Baseline | 146.48 | 1.00× | 28.19 | 6.72 | 6.72 | – |
+| EAGLE-3 | 281.09 | 1.92× | 29.28 | 3.38 | 7.81 | 2.28 |
+| DSpark, fixed | 397.85 | 2.72× | 34.70 | 2.33 | 8.78 | 3.76 |
+| DSpark, adaptive | 372.88 | 2.55× | 24.85 | 2.52 | 9.59 | 3.76 |
+
+| Heavy load | Output (tok/s) | Speedup | Mean TTFT (ms) | Mean TPOT (ms) | Median TPOT (ms) | P99 TPOT (ms) | Acceptance length |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Baseline | 6118.06 | 1.00× | 173.49 | 8.80 | 8.62 | 11.28 | – |
+| EAGLE-3 | 8062.66 | 1.32× | 195.31 | 6.38 | 6.42 | 9.41 | 2.28 |
+| DSpark, fixed | 8328.94 | 1.36× | 227.04 | 6.05 | 5.62 | 11.33 | 3.78 |
+| DSpark, adaptive | 8851.21 | 1.45× | 96.54 | 7.96 | 4.87 | 47.77 | 3.57 |
+
+*Speedup is output throughput relative to the baseline. Time per round is the mean ITL, since each streamed chunk carries one round of tokens. Each heavy-load run lasts only 8 to 11 seconds, so gaps of a few percent may be noise.*
+
 ## 7. Takeaways
 
 - **Drafting and verification solve different problems.** A deep parallel backbone with a tiny Markov head makes it cheap to draft long, coherent blocks, while a separate scheduler decides how many of those tokens are worth sending to the target model.
