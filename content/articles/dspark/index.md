@@ -5,7 +5,7 @@ description = "A serving engineer's read of DSpark (arXiv:2607.05147) — how se
 tags = ["llm-inference", "llm-serving", "paper-review"]
 +++
 
-In speculative decoding, by verifying a few extra draft tokens may help one request, but under heavy load those tokens can consume GPU capacity that could have served other requests. DSpark solves this by estimating the chance that each draft token will be accepted and checking how busy the GPU is. When the GPU has capacity, it verifies more tokens. If not, it verifies fewer, because extra tokens would slow the whole batch. As a result, this method help to improve total throughput high.
+In speculative decoding, verifying a few extra draft tokens may help one request, but under heavy load those tokens can consume GPU capacity that could have served other requests. DSpark solves this by estimating the chance that each draft token will be accepted and checking how busy the GPU is. When the GPU has capacity, it verifies more tokens. If not, it verifies fewer, because extra tokens would slow the whole batch. As a result, this method helps keep total throughput high.
 
 <!--more-->
 
@@ -68,9 +68,9 @@ Parallel drafting makes long blocks cheap to produce, but verifying every drafte
 - **Data:** on the left of the figure, acceptance depends on the request. Structured text such as code sustains much higher acceptance than open-ended chat, so any single length is too short for some requests and too long for others.
 - **System load:** on the right of the figure, verifying an extra token at light load can be nearly free when the GPU has idle capacity and is waiting on memory anyway, so even a rejected token costs almost nothing. Under heavy load, every token sent for verification adds to the batch the target model processes in that step, and the step gets slower as that batch grows. A token that is likely to be rejected takes batch capacity that could have served another request.
 
-Put together, the two methods have a opposite disadvantage. Autoregressive drafters are weak at the first position, and parallel drafters get weaker at later ones. The first position matters most since a miss there throws away the whole block. DSpark targets this gap by retaining the parallel drafter's strong first position while reducing decay at later positions.
+Put together, the two methods have opposite disadvantages. Autoregressive drafters are weak at the first position, and parallel drafters get weaker at later ones. The first position matters most since a miss there throws away the whole block. DSpark targets this gap by retaining the parallel drafter's strong first position while reducing decay at later positions.
 
-Also, prior methods also either verify a fixed number of tokens or use a static confidence threshold. Neither accounts for current system load that can work under single-request assumptions, but in a high-concurrency production system, there are many issues that need to addresses. Before DSpark, DeepSeek's production serving used MTP-1, a single draft token, because deploying a static multi-token drafter (MTP-3 or MTP-5) degraded aggregate throughput under high concurrency.
+Also, prior methods either verify a fixed number of tokens or use a static confidence threshold. Neither accounts for current system load. That can work under single-request assumptions, but in a high-concurrency production system, there are many issues that need to be addressed. Before DSpark, DeepSeek's production serving used MTP-1, a single draft token, because deploying a static multi-token drafter (MTP-3 or MTP-5) degraded aggregate throughput under high concurrency.
 
 ## 4. How DSpark works
 
@@ -106,7 +106,7 @@ With the survival scores ready, the scheduler decides how many draft tokens to s
 
 {{< figure src="scheduler-production.png" link="scheduler-production.png" alt="Left: GPU step time rises in plateaus with sharp jumps at tile boundaries, so expected tok/s dips before reaching its true peak. Early stopping picks the first local peak, while a full-table search finds the true one. Right: while Step t-1 runs on the GPU, the scheduler uses Step t-2 confidences to fix the batch budget B* early, then fills those slots with the latest scores after Step t-1 finishes." caption="Two production adjustments: searching the full step-time table past tile-boundary dips, and using two-step lookback to size the batch without stalling the GPU pipeline" >}}
 
-Running this in a production serving engine takes two small adjustments, shown in the figure above. The first, on the left, deals with the shape of the step-time curve. GPU step time does not rise smoothly as the batch grows. It stays flat for a while and then jumps when a hardware tile fills up, which creates small dips in expected tokens per second. Instead of stopping at the first dip, the scheduler checks the whole step-time table to find the true peak. The second, on the right, deals with timing. The engine prepares the next batch while the GPU is still running the current one, so it cannot wait for the newest confidence scores to choose the batch size. DSpark uses the scores from two steps earlier to decide how many tokens fit in the batch, then fills those slots with the latest scores once they arrive.
+Moreover, running this in a production serving engine takes two small adjustments, shown in the figure above. The first, on the left, deals with the shape of the step-time curve. GPU step time does not rise smoothly as the batch grows. It stays flat for a while and then jumps when a hardware tile fills up, which creates small dips in expected tokens per second. Instead of stopping at the first dip, the scheduler checks the whole step-time table to find the true peak. The second, on the right, deals with timing. The engine prepares the next batch while the GPU is still running the current one, so it cannot wait for the newest confidence scores to choose the batch size. DSpark uses the scores from two steps earlier to decide how many tokens fit in the batch, then fills those slots with the latest scores once they arrive.
 
 ## 5. Results
 
@@ -196,7 +196,7 @@ From my perspective, a few more trade-offs are worth keeping in mind.
 
 ### Step 1. Install vLLM
 
-First we need to install vllm in a python evironment and in this demo we will use `bench` package to demonstrate DSpark. Then run `vllm download-kernels` to install FlashInfer's precompiled kernels to reduce start time. Even with Triton attention, vLLM uses FlashInfer for some processes.
+First, we need to install vLLM in a Python environment, and in this demo we will use the `bench` extra to demonstrate DSpark. Then run `vllm download-kernels` to install FlashInfer's precompiled kernels to reduce startup time. Even with Triton attention, vLLM uses FlashInfer for some operations.
 
 {{< tabs >}}
 {{< tab "GPU machine" >}}
@@ -278,7 +278,7 @@ EOF
 
 ### Step 2. Launch vLLM with DSpark
 
-Use `--speculative-config` to config a DSpark drafter that matches your target model. The released Qwen3 drafters were trained with thinking mode turned off, so the server turns it off too. Prefix caching is disabled so that repeated benchmark runs do not reuse cached prompts and inflate the results. Adaptive verification also needs an attention backend whose CUDA graphs can handle a different number of tokens for each request. Also, on GPUs such as the A100, L40S and RTX PRO 6000, vLLM's default FlashAttention 2 backend cannot do this and fails at startup, so the server uses Triton attention instead.
+Use `--speculative-config` to configure a DSpark drafter that matches your target model. The released Qwen3 drafters were trained with thinking mode turned off, so the server turns it off too. Prefix caching is disabled so that repeated benchmark runs do not reuse cached prompts and inflate the results. Adaptive verification also needs an attention backend whose CUDA graphs can handle a different number of tokens for each request. On GPUs such as the A100, L40S and RTX PRO 6000, vLLM's default FlashAttention 2 backend cannot do this and fails at startup, so the server uses Triton attention instead.
 
 {{< tabs >}}
 {{< tab "GPU machine" >}}
@@ -362,9 +362,35 @@ The reply should look like any normal Qwen3-8B answer. In the server log, a line
 
 ### Step 3. Benchmark light and heavy load
 
-In this demo we will run compare between Light load sends one request at a time, and heavy load keeps 64 requests with three comparsion such as no speculative decoding, using speculative decoding with EAGLE and using speculative decoding with DSpark.
+In this demo, we will compare light load, which sends one request at a time, with heavy load, which keeps 64 requests in flight, across three setups: no speculative decoding, speculative decoding with EAGLE-3, and speculative decoding with DSpark.
 
-#### 3.1 No speculative decoding
+#### 3.1 Prepare the benchmark scripts
+
+Save each load as a script to reuse with every server.
+
+```bash
+# Light load, one request at a time
+cat > light.sh <<'EOF'
+vllm bench serve \
+  --backend openai-chat --endpoint /v1/chat/completions \
+  --model Qwen/Qwen3-8B --skip-chat-template \
+  --dataset-name hf --dataset-path philschmid/mt-bench \
+  --num-prompts 80 --max-concurrency 1
+EOF
+```
+
+```bash
+# Heavy load, 64 requests at a time
+cat > heavy.sh <<'EOF'
+vllm bench serve \
+  --backend openai-chat --endpoint /v1/chat/completions \
+  --model Qwen/Qwen3-8B --skip-chat-template \
+  --dataset-name hf --dataset-path philschmid/mt-bench \
+  --num-prompts 320 --max-concurrency 64
+EOF
+```
+
+#### 3.2 No speculative decoding
 
 This is the baseline, where the target model generates one token per step.
 
@@ -381,19 +407,13 @@ vllm serve Qwen/Qwen3-8B \
 ```
 
 ```bash
-# Terminal 2: light load, one request at a time
-vllm bench serve \
-  --backend openai-chat --endpoint /v1/chat/completions \
-  --model Qwen/Qwen3-8B --skip-chat-template \
-  --dataset-name hf --dataset-path philschmid/mt-bench \
-  --num-prompts 80 --max-concurrency 1
+# Terminal 2: light load
+bash light.sh
+```
 
-# Terminal 2: heavy load, 64 requests at a time
-vllm bench serve \
-  --backend openai-chat --endpoint /v1/chat/completions \
-  --model Qwen/Qwen3-8B --skip-chat-template \
-  --dataset-name hf --dataset-path philschmid/mt-bench \
-  --num-prompts 320 --max-concurrency 64
+```bash
+# Terminal 2: heavy load
+bash heavy.sh
 ```
 {{< /tab >}}
 {{< tab "Modal" >}}
@@ -410,32 +430,18 @@ EOF
 ```
 
 ```bash
-# Save the light and heavy load benchmarks
-cat > client.sh <<'EOF'
-# light load, one request at a time
-vllm bench serve \
-  --backend openai-chat --endpoint /v1/chat/completions \
-  --model Qwen/Qwen3-8B --skip-chat-template \
-  --dataset-name hf --dataset-path philschmid/mt-bench \
-  --num-prompts 80 --max-concurrency 1
-
-# heavy load, 64 requests at a time
-vllm bench serve \
-  --backend openai-chat --endpoint /v1/chat/completions \
-  --model Qwen/Qwen3-8B --skip-chat-template \
-  --dataset-name hf --dataset-path philschmid/mt-bench \
-  --num-prompts 320 --max-concurrency 64
-EOF
+# Light load on a Modal H100
+modal run dspark_modal.py --server server.sh --client light.sh
 ```
 
 ```bash
-# Run both on a Modal H100
-modal run dspark_modal.py --server server.sh --client client.sh
+# Heavy load on a Modal H100
+modal run dspark_modal.py --server server.sh --client heavy.sh
 ```
 {{< /tab >}}
 {{< /tabs >}}
 
-#### 3.2 Speculative decoding with EAGLE-3
+#### 3.3 Speculative decoding with EAGLE-3
 
 EAGLE-3 drafts one token at a time, so each extra draft token costs another drafter pass. Red Hat's EAGLE-3 drafter for Qwen3-8B was trained with thinking turned off and recommends three draft tokens. Its training data differs from DeepSeek's drafters, so this compares the released drafters rather than reproducing the paper's Table 1.
 
@@ -457,19 +463,13 @@ vllm serve Qwen/Qwen3-8B \
 ```
 
 ```bash
-# Terminal 2: light load, one request at a time
-vllm bench serve \
-  --backend openai-chat --endpoint /v1/chat/completions \
-  --model Qwen/Qwen3-8B --skip-chat-template \
-  --dataset-name hf --dataset-path philschmid/mt-bench \
-  --num-prompts 80 --max-concurrency 1
+# Terminal 2: light load
+bash light.sh
+```
 
-# Terminal 2: heavy load, 64 requests at a time
-vllm bench serve \
-  --backend openai-chat --endpoint /v1/chat/completions \
-  --model Qwen/Qwen3-8B --skip-chat-template \
-  --dataset-name hf --dataset-path philschmid/mt-bench \
-  --num-prompts 320 --max-concurrency 64
+```bash
+# Terminal 2: heavy load
+bash heavy.sh
 ```
 {{< /tab >}}
 {{< tab "Modal" >}}
@@ -491,34 +491,20 @@ EOF
 ```
 
 ```bash
-# Save the light and heavy load benchmarks
-cat > client.sh <<'EOF'
-# light load, one request at a time
-vllm bench serve \
-  --backend openai-chat --endpoint /v1/chat/completions \
-  --model Qwen/Qwen3-8B --skip-chat-template \
-  --dataset-name hf --dataset-path philschmid/mt-bench \
-  --num-prompts 80 --max-concurrency 1
-
-# heavy load, 64 requests at a time
-vllm bench serve \
-  --backend openai-chat --endpoint /v1/chat/completions \
-  --model Qwen/Qwen3-8B --skip-chat-template \
-  --dataset-name hf --dataset-path philschmid/mt-bench \
-  --num-prompts 320 --max-concurrency 64
-EOF
+# Light load on a Modal H100
+modal run dspark_modal.py --server server.sh --client light.sh
 ```
 
 ```bash
-# Run both on a Modal H100
-modal run dspark_modal.py --server server.sh --client client.sh
+# Heavy load on a Modal H100
+modal run dspark_modal.py --server server.sh --client heavy.sh
 ```
 {{< /tab >}}
 {{< /tabs >}}
 
-#### 3.3 Speculative decoing with DSpark
+#### 3.4 Speculative decoding with DSpark
 
-##### 3.3.1 with a fixed draft length
+##### 3.4.1 With a fixed draft length
 
 This uses the same DSpark drafter as Step 2 with adaptive verification turned off, so every request verifies all 7 draft tokens, just like standard speculative decoding.
 
@@ -541,19 +527,13 @@ vllm serve Qwen/Qwen3-8B \
 ```
 
 ```bash
-# Terminal 2: light load, one request at a time
-vllm bench serve \
-  --backend openai-chat --endpoint /v1/chat/completions \
-  --model Qwen/Qwen3-8B --skip-chat-template \
-  --dataset-name hf --dataset-path philschmid/mt-bench \
-  --num-prompts 80 --max-concurrency 1
+# Terminal 2: light load
+bash light.sh
+```
 
-# Terminal 2: heavy load, 64 requests at a time
-vllm bench serve \
-  --backend openai-chat --endpoint /v1/chat/completions \
-  --model Qwen/Qwen3-8B --skip-chat-template \
-  --dataset-name hf --dataset-path philschmid/mt-bench \
-  --num-prompts 320 --max-concurrency 64
+```bash
+# Terminal 2: heavy load
+bash heavy.sh
 ```
 {{< /tab >}}
 {{< tab "Modal" >}}
@@ -576,32 +556,18 @@ EOF
 ```
 
 ```bash
-# Save the light and heavy load benchmarks
-cat > client.sh <<'EOF'
-# light load, one request at a time
-vllm bench serve \
-  --backend openai-chat --endpoint /v1/chat/completions \
-  --model Qwen/Qwen3-8B --skip-chat-template \
-  --dataset-name hf --dataset-path philschmid/mt-bench \
-  --num-prompts 80 --max-concurrency 1
-
-# heavy load, 64 requests at a time
-vllm bench serve \
-  --backend openai-chat --endpoint /v1/chat/completions \
-  --model Qwen/Qwen3-8B --skip-chat-template \
-  --dataset-name hf --dataset-path philschmid/mt-bench \
-  --num-prompts 320 --max-concurrency 64
-EOF
+# Light load on a Modal H100
+modal run dspark_modal.py --server server.sh --client light.sh
 ```
 
 ```bash
-# Run both on a Modal H100
-modal run dspark_modal.py --server server.sh --client client.sh
+# Heavy load on a Modal H100
+modal run dspark_modal.py --server server.sh --client heavy.sh
 ```
 {{< /tab >}}
 {{< /tabs >}}
 
-##### 3.3.2 with adaptive verification
+##### 3.4.2 With adaptive verification
 
 This is the same server as Step 2, with both the drafter and adaptive verification turned on.
 
@@ -624,19 +590,13 @@ vllm serve Qwen/Qwen3-8B \
 ```
 
 ```bash
-# Terminal 2: light load, one request at a time
-vllm bench serve \
-  --backend openai-chat --endpoint /v1/chat/completions \
-  --model Qwen/Qwen3-8B --skip-chat-template \
-  --dataset-name hf --dataset-path philschmid/mt-bench \
-  --num-prompts 80 --max-concurrency 1
+# Terminal 2: light load
+bash light.sh
+```
 
-# Terminal 2: heavy load, 64 requests at a time
-vllm bench serve \
-  --backend openai-chat --endpoint /v1/chat/completions \
-  --model Qwen/Qwen3-8B --skip-chat-template \
-  --dataset-name hf --dataset-path philschmid/mt-bench \
-  --num-prompts 320 --max-concurrency 64
+```bash
+# Terminal 2: heavy load
+bash heavy.sh
 ```
 {{< /tab >}}
 {{< tab "Modal" >}}
@@ -659,31 +619,16 @@ EOF
 ```
 
 ```bash
-# Save the light and heavy load benchmarks
-cat > client.sh <<'EOF'
-# light load, one request at a time
-vllm bench serve \
-  --backend openai-chat --endpoint /v1/chat/completions \
-  --model Qwen/Qwen3-8B --skip-chat-template \
-  --dataset-name hf --dataset-path philschmid/mt-bench \
-  --num-prompts 80 --max-concurrency 1
-
-# heavy load, 64 requests at a time
-vllm bench serve \
-  --backend openai-chat --endpoint /v1/chat/completions \
-  --model Qwen/Qwen3-8B --skip-chat-template \
-  --dataset-name hf --dataset-path philschmid/mt-bench \
-  --num-prompts 320 --max-concurrency 64
-EOF
+# Light load on a Modal H100
+modal run dspark_modal.py --server server.sh --client light.sh
 ```
 
 ```bash
-# Run both on a Modal H100
-modal run dspark_modal.py --server server.sh --client client.sh
+# Heavy load on a Modal H100
+modal run dspark_modal.py --server server.sh --client heavy.sh
 ```
 {{< /tab >}}
 {{< /tabs >}}
-
 
 ## 7. Takeaways
 
