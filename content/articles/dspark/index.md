@@ -194,7 +194,7 @@ From my perspective, a few more trade-offs are worth keeping in mind.
 
 [vLLM](https://docs.vllm.ai/en/stable/features/speculative_decoding/adaptive_verification/) already supports both parts of DSpark. Setting `"method": "dspark"` runs the semi-autoregressive drafter from Section 4.1, and setting `"enable_adaptive_verification": true` adds the confidence-scheduled verification from Section 4.2. With adaptive verification on, vLLM scores each draft token with the checkpoint's confidence head and uses a step-time table profiled at startup to decide how many tokens each request should verify.
 
-### Step 1. Install vLLM
+### 1. Install vLLM
 
 First, we need to install vLLM in a Python environment, and in this demo we will use the `bench` extra to demonstrate DSpark. Then run `vllm download-kernels` to install FlashInfer's precompiled kernels to reduce startup time. Even with Triton attention, vLLM uses FlashInfer for some operations.
 
@@ -276,7 +276,7 @@ EOF
 {{< /tab >}}
 {{< /tabs >}}
 
-### Step 2. Launch vLLM with DSpark
+### 2. Launch vLLM with DSpark
 
 Use `--speculative-config` to configure a DSpark drafter that matches your target model. The released Qwen3 drafters were trained with thinking mode turned off, so the server turns it off too. Prefix caching is disabled so that repeated benchmark runs do not reuse cached prompts and inflate the results. Adaptive verification also needs an attention backend whose CUDA graphs can handle a different number of tokens for each request. On GPUs such as the A100, L40S and RTX PRO 6000, vLLM's default FlashAttention 2 backend cannot do this and fails at startup, so the server uses Triton attention instead.
 
@@ -360,7 +360,7 @@ modal run dspark_modal.py --server server.sh --client client.sh
 
 The reply should look like any normal Qwen3-8B answer. In the server log, a line starting with `SpecDecoding metrics` reports the mean acceptance length, the average number of tokens each round produces, including the target model's own token.
 
-### Step 3. Benchmark light and heavy load
+### 3. Benchmark light and heavy load
 
 In this demo, we will compare light load, which sends one request at a time, with heavy load, which keeps 64 requests in flight, across three setups: no speculative decoding, speculative decoding with EAGLE-3, and speculative decoding with DSpark.
 
