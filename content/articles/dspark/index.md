@@ -673,8 +673,6 @@ The tables below collect the results from the screenshots above, all run on a Mo
 | DSpark, fixed | 8328.94 | 1.36× | 227.04 | 6.05 | 5.62 | 11.33 | 3.78 |
 | DSpark, adaptive | 8851.21 | 1.45× | 96.54 | 7.96 | 4.87 | 47.77 | 3.57 |
 
-*Speedup is output throughput relative to the baseline. Time per round is the mean ITL, since each streamed chunk carries one round of tokens.*
-
 Under heavy load, these results line up with the paper in two ways.
 
 - **Acceptance length:** with a fixed draft length, DSpark accepts 3.78 tokens per round on MT-Bench, close to the 3.72 the paper reports for Qwen3-8B in Table 1.
